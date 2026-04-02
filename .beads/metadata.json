@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "beads_x_superpowers_workflow",
+  "project_id": "1b3993a7-a20f-437d-91f3-e6f07c4abf3c"
+}
