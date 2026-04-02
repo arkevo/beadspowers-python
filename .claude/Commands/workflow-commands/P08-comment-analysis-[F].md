@@ -367,7 +367,7 @@ After analysis, verify findings by:
 
 ```python
 # Restating the obvious
-def build(self) -> Widget:
+def build(self) -> Response:
     """The build method."""
     ...
 
