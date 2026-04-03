@@ -32,7 +32,7 @@ For each changed file in `src/`:
 2. Note if the test file exists but was not updated alongside the source change
 3. Note if the test file is missing entirely
 
-Use Glob and Grep to efficiently locate test files. Do not use `mcp__serena__*` tools.
+Use Glob and Grep to efficiently locate test files.
 
 ### Step 2: Identify Changed Symbols
 
