@@ -9,9 +9,9 @@ description: Ship completed task - commit, push, close Beads task, check epic co
 echo "Committing" > .beads/.workflow-step
 ```
 
-## Step 2: Commit and Push
-- No PR requested → Invoke `commit-commands:commit-push`
-- PR requested → Invoke `commit-commands:commit-push-pr`
+## Step 2: Commit and Create PR
+- Always invoke `commit-commands:commit-push-pr`
+- Direct pushes to master are not allowed — all changes must go through a PR
 
 ## Step 3: Close Beads Task
 After successful push:

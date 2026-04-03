@@ -29,8 +29,7 @@ When showing ready tasks, ALWAYS check `bd list --status=in_progress` for an act
 | "Improve the plan" / "Question the plan" | `workflow-commands:plan-refinement-qa` |
 | "Execute the plan" / "Run the plan" | `superpowers:executing-plans` (gate via execution-option-gate) |
 | "Execute with subagents" / "Subagent-driven" | `superpowers:subagent-driven-development` (gate via execution-option-gate) |
-| "Ship it" / "Send it" / "Commit and push" | `workflow-commands:beads-ship-task` |
-| "Create a PR" / "PR this" / "I'm ready to create a PR" | `workflow-commands:beads-ship-task` (with PR flag) |
+| "Ship it" / "Send it" / "Commit and push" / "Create a PR" / "PR this" | `workflow-commands:beads-ship-task` (always creates PR) |
 | "Quick verify" / "just lint and test" | `workflow-commands:python-verification-quick` |
 | "Standard verify" / "verify without agents" | `workflow-commands:python-verification-standard` |
 | "Full verify" / "complete verification" | `workflow-commands:python-verification-full` |
