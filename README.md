@@ -34,7 +34,7 @@ The router (`beads-workflow-router.md`) enforces this mandatory sequence:
 3. **Refine** — `plan-refinement-qa` runs Q&A to stress-test the plan
 4. **Execute** — User chooses sequential (`superpowers:executing-plans`) or parallel (`superpowers:subagent-driven-development`)
 5. **Verify** — `beads-post-execution` auto-invokes, presents verification tier options
-6. **Ship** — `beads-ship-task` commits, pushes, creates a PR, closes the beads issue
+6. **Ship** — `beads-ship-task` commits, pushes, creates a PR (with structured description), deletes the branch, closes the beads issue
 
 ### Natural Language Triggers
 
@@ -111,6 +111,7 @@ The hooks in `.claude/hooks/` require:
 | Tool | Purpose | Install |
 |------|---------|---------|
 | `jq` | JSON parsing in hook scripts | `brew install jq` (macOS) |
+| `gh` | GitHub CLI for PR creation and code review | `brew install gh` then `gh auth login` |
 
 ## Installation
 
@@ -187,7 +188,7 @@ This creates the `.beads/` directory for issue tracking.
 │   └── workflow-commands/               # Custom workflow skills
 │       ├── beads-import-prd.md          # Import PRD into beads issues
 │       ├── beads-post-execution.md      # Post-execution verification
-│       ├── beads-ship-task.md           # Commit, push, close task
+│       ├── beads-ship-task.md           # Commit, PR (structured desc), branch cleanup, close task
 │       ├── beads-start-task.md          # Start task + create branch
 │       ├── python-verification-*.md     # Quick/Standard/Full tiers
 │       ├── hotfix-interrupt.md          # Emergency hotfix flow
@@ -201,8 +202,7 @@ This creates the `.beads/` directory for issue tracking.
 ├── rules/
 │   ├── 0_Beads x Superpowers/
 │   │   └── beads-workflow-router.md     # Natural language -> skill router
-│   ├── no-direct-push-to-master.md      # Blocks direct pushes to master/main
-│   └── skill-usage.md                   # Naming conventions + enforcement
+│   └── (add project-specific rules here)
 └── settings.json                        # Hook wiring + plugin enables
 ```
 
@@ -247,5 +247,5 @@ The P02–P14 phase commands and verification agents are Python-focused, using *
 The exported `settings.json` includes permissions and plugin enables. Review and adjust:
 
 - `permissions.allow` — Empty by default; add tool-specific permissions as needed
-- `permissions.deny` — Safety rails preventing `rm -rf /`, `git push --force`, `git reset --hard`, and direct pushes to `master`/`main`
+- `permissions.deny` — Add safety rails as needed (e.g., prevent destructive commands)
 - `enabledPlugins` — Keep superpowers, codex, and commit-commands; remove any you don't use
