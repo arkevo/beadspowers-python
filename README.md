@@ -167,7 +167,9 @@ If your project already has `.claude/settings.json`, merge these sections from t
 chmod +x .claude/hooks/*.sh
 ```
 
-### 4. Initialize Beads (if not already done)
+### 4. Initialize Beads
+
+> **Skip this step** if you already have a `.beads/` directory or have previously installed Beads in your project.
 
 ```bash
 bd init
