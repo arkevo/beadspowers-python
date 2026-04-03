@@ -4,7 +4,7 @@ A structured AI-assisted development workflow for Claude Code that combines
 **Beads** (git-backed issue tracking) with **Superpowers** (plan-execute-verify lifecycle) into an enforced sequence.
 
 ```
-Start Task -> Plan -> Refine Plan -> Execute -> Verify -> Ship
+Start Task -> Plan -> Refine Plan -> Execute -> Verify -> Ship (PR)
 ```
 
 ## Features
@@ -34,7 +34,7 @@ The router (`beads-workflow-router.md`) enforces this mandatory sequence:
 3. **Refine** — `plan-refinement-qa` runs Q&A to stress-test the plan
 4. **Execute** — User chooses sequential (`superpowers:executing-plans`) or parallel (`superpowers:subagent-driven-development`)
 5. **Verify** — `beads-post-execution` auto-invokes, presents verification tier options
-6. **Ship** — `beads-ship-task` commits, pushes, closes the beads issue
+6. **Ship** — `beads-ship-task` commits, pushes, creates a PR, closes the beads issue
 
 ### Natural Language Triggers
 
@@ -45,7 +45,7 @@ The router (`beads-workflow-router.md`) enforces this mandatory sequence:
 | "Plan this" | `superpowers:writing-plans` |
 | "Refine the plan" | `plan-refinement-qa` |
 | "Execute the plan" | Execution gate (sequential vs parallel) |
-| "Ship it" | `beads-ship-task` |
+| "Ship it" | `beads-ship-task` (always creates PR) |
 | "Quick verify" | `python-verification-quick` |
 | "Standard verify" | `python-verification-standard` |
 | "Full verify" | `python-verification-full` |
@@ -201,6 +201,7 @@ This creates the `.beads/` directory for issue tracking.
 ├── rules/
 │   ├── 0_Beads x Superpowers/
 │   │   └── beads-workflow-router.md     # Natural language -> skill router
+│   ├── no-direct-push-to-master.md      # Blocks direct pushes to master/main
 │   └── skill-usage.md                   # Naming conventions + enforcement
 └── settings.json                        # Hook wiring + plugin enables
 ```
@@ -246,5 +247,5 @@ The P02–P14 phase commands and verification agents are Python-focused, using *
 The exported `settings.json` includes permissions and plugin enables. Review and adjust:
 
 - `permissions.allow` — Empty by default; add tool-specific permissions as needed
-- `permissions.deny` — Safety rails preventing `rm -rf /`, `git push --force`, and `git reset --hard`
+- `permissions.deny` — Safety rails preventing `rm -rf /`, `git push --force`, `git reset --hard`, and direct pushes to `master`/`main`
 - `enabledPlugins` — Keep superpowers, codex, and commit-commands; remove any you don't use
