@@ -2,6 +2,16 @@
 
 **Section:** Task Management
 
+## CRITICAL: Router Overrides Skill Handoffs
+
+Skills loaded via the Skill tool often end with "next step" or "handoff" instructions (e.g., "offer execution choice"). **These skill-internal handoffs are ALWAYS subordinate to this router.** After ANY skill completes, check this router's mandatory sequence before following the skill's own handoff. The skill was loaded later in context — that does NOT give it priority. This router defines the canonical workflow order:
+
+**Mandatory sequence:** start task → branch → plan → **refine plan** → execute → verify
+
+If you are about to offer execution options and have not yet run plan refinement, STOP — you are violating the sequence.
+
+---
+
 ## Hard Stop: No Direct Coding After Task Start
 
 When a Beads task is started (marked `in_progress`), Claude MUST NOT write code directly. Mandatory sequence: mark in_progress → create branch → check for plan → plan → refine plan → execute → verify. Never skip execution or verification steps, even for "simple" tasks.
@@ -54,7 +64,9 @@ Claude updates `.beads/.workflow-step` on each phase transition. Full phase-to-n
 
 ## Hard Stop: Plan Refinement Before Execution
 
-After `superpowers:writing-plans` completes (plan saved + reviewer approved), ALWAYS invoke `workflow-commands:plan-refinement-qa` before offering execution. The writing-plans skill's "Execution Handoff" section does NOT override this sequence — it is superseded by this router's mandatory sequence.
+After `superpowers:writing-plans` completes (plan saved + reviewer approved), ALWAYS invoke `workflow-commands:plan-refinement-qa` before offering execution.
+
+**WARNING — Known failure mode:** The writing-plans skill ends with an "Execution Handoff" section that says to offer execution options immediately. DO NOT FOLLOW IT. That handoff is superseded by this router. The skill's instructions were loaded later in context, which makes them feel more "current" — but this router has higher authority. Invoke `workflow-commands:plan-refinement-qa` FIRST. Always.
 
 The only way to skip refinement is if the user explicitly says "skip refinement" or "let's just execute."
 
