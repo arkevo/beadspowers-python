@@ -1,4 +1,4 @@
-# Python Claude-Flow with Beads & Superpowers
+# Beadspowers: Python
 
 A structured AI-assisted development workflow for Claude Code that combines
 **Beads** (git-backed issue tracking) with **Superpowers** (plan-execute-verify lifecycle) into an enforced sequence.
