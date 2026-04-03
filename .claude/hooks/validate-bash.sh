@@ -30,6 +30,8 @@ DANGEROUS_PATTERNS=(
     "wget.*\\| sh"
     "git push.*--force"
     "git push.*-f"
+    "git push.*\bmaster\b"
+    "git push.*\bmain\b"
     "DROP TABLE"
     "DROP DATABASE"
     "DELETE FROM.*WHERE 1"
