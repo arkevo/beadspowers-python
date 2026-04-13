@@ -151,3 +151,58 @@ def test_index_route_returns_html(client):
     response = client.get("/")
     assert response.status_code == 200
     assert b"html" in response.data.lower()
+
+
+def test_update_task_empty_body_succeeds(client):
+    """PATCH with no fields is a no-op — should succeed and return the task unchanged."""
+    create_resp = client.post(
+        "/tasks",
+        data=json.dumps({"title": "Stable task"}),
+        content_type="application/json",
+    )
+    task = create_resp.get_json()
+    response = client.patch(
+        f"/tasks/{task['id']}",
+        data=json.dumps({}),
+        content_type="application/json",
+    )
+    assert response.status_code == 200
+    assert response.get_json()["title"] == "Stable task"
+
+
+def test_update_task_toggle_to_incomplete(client):
+    """Toggle a completed task back to incomplete."""
+    create_resp = client.post(
+        "/tasks",
+        data=json.dumps({"title": "Done task"}),
+        content_type="application/json",
+    )
+    task_id = create_resp.get_json()["id"]
+    client.patch(
+        f"/tasks/{task_id}",
+        data=json.dumps({"completed": True}),
+        content_type="application/json",
+    )
+    response = client.patch(
+        f"/tasks/{task_id}",
+        data=json.dumps({"completed": False}),
+        content_type="application/json",
+    )
+    assert response.status_code == 200
+    assert response.get_json()["completed"] is False
+
+
+def test_update_task_whitespace_title_rejected(client):
+    """PATCH with whitespace-only title should be rejected."""
+    create_resp = client.post(
+        "/tasks",
+        data=json.dumps({"title": "Real task"}),
+        content_type="application/json",
+    )
+    task_id = create_resp.get_json()["id"]
+    response = client.patch(
+        f"/tasks/{task_id}",
+        data=json.dumps({"title": "   "}),
+        content_type="application/json",
+    )
+    assert response.status_code == 400

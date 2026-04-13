@@ -40,6 +40,8 @@ def create_app(db_path: str = DEFAULT_DB_PATH) -> Flask:
         if title is not None:
             title = str(title).strip()
         updated = update_task(app.config["DB_PATH"], task_id, title=title, completed=completed)
+        if updated is None:
+            return jsonify({"error": "task not found"}), 404
         return jsonify(updated), 200
 
     @app.route("/tasks/<task_id>", methods=["DELETE"])
