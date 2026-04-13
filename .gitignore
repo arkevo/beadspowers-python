@@ -29,3 +29,7 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Todo App
+todos.db
+.pytest_cache/
