@@ -1,12 +1,52 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>To-Do App</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Tasks</title>
+  <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
-    <h1>To-Do App</h1>
-    <p>Coming soon...</p>
+  <div class="app">
+    <header class="app-header">
+      <h1>My Tasks</h1>
+      <span id="task-count" class="task-count" aria-live="polite"></span>
+    </header>
+
+    <section class="input-section" aria-label="Add new task">
+      <form id="add-form" class="add-form">
+        <label for="task-input" class="sr-only">New task</label>
+        <input
+          id="task-input"
+          type="text"
+          class="task-input"
+          placeholder="What needs to get done?"
+          aria-label="New task"
+          autocomplete="off"
+          maxlength="200"
+        />
+        <button type="submit" id="add-btn" class="btn btn-primary" aria-label="Add task" disabled>+</button>
+      </form>
+    </section>
+
+    <nav class="filter-nav" aria-label="Filter tasks">
+      <button class="filter-btn active" data-filter="all" aria-pressed="true">All</button>
+      <button class="filter-btn" data-filter="active" aria-pressed="false">Active</button>
+      <button class="filter-btn" data-filter="completed" aria-pressed="false">Completed</button>
+    </nav>
+
+    <main>
+      <ul id="task-list" class="task-list" aria-label="Task list" aria-live="polite"></ul>
+      <div id="empty-state" class="empty-state" hidden>
+        <p>No tasks yet</p>
+        <p class="empty-subtitle">Add your first task to begin.</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast notification for API errors -->
+  <div id="toast" class="toast" role="alert" aria-live="assertive" hidden></div>
+
+  <script src="/static/app.js"></script>
 </body>
 </html>
