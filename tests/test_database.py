@@ -1,6 +1,4 @@
-import pytest
 from database import (
-    init_db,
     create_task,
     get_all_tasks,
     get_task,
@@ -11,8 +9,11 @@ from database import (
 
 def test_init_db_creates_tasks_table(db_path):
     from database import get_db_connection
+
     conn = get_db_connection(db_path)
-    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tasks'")
+    cursor = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='tasks'"
+    )
     assert cursor.fetchone() is not None
     conn.close()
 
@@ -68,6 +69,7 @@ def test_update_task_completion(db_path):
 
 def test_update_task_updated_at_changes(db_path):
     import time
+
     task = create_task(db_path, "Task")
     time.sleep(0.01)
     updated = update_task(db_path, task["id"], title="Updated")

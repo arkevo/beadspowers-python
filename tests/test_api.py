@@ -1,5 +1,4 @@
 import json
-import pytest
 
 
 def test_get_tasks_empty(client):
@@ -154,7 +153,7 @@ def test_index_route_returns_html(client):
 
 
 def test_update_task_empty_body_succeeds(client):
-    """PATCH with no fields is a no-op — should succeed and return the task unchanged."""
+    """PATCH with no fields should succeed and preserve title and completed status."""
     create_resp = client.post(
         "/tasks",
         data=json.dumps({"title": "Stable task"}),

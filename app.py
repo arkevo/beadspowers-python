@@ -1,6 +1,13 @@
 import os
 from flask import Flask, jsonify, request, send_from_directory
-from database import init_db, create_task, get_all_tasks, get_task, update_task, delete_task
+from database import (
+    init_db,
+    create_task,
+    get_all_tasks,
+    get_task,
+    update_task,
+    delete_task,
+)
 
 DEFAULT_DB_PATH = os.path.join(os.path.dirname(__file__), "todos.db")
 
@@ -39,7 +46,9 @@ def create_app(db_path: str = DEFAULT_DB_PATH) -> Flask:
             return jsonify({"error": "title cannot be empty"}), 400
         if title is not None:
             title = str(title).strip()
-        updated = update_task(app.config["DB_PATH"], task_id, title=title, completed=completed)
+        updated = update_task(
+            app.config["DB_PATH"], task_id, title=title, completed=completed
+        )
         if updated is None:
             return jsonify({"error": "task not found"}), 404
         return jsonify(updated), 200

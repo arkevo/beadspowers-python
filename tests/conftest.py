@@ -11,7 +11,8 @@ def db_path(tmp_path):
 
 @pytest.fixture
 def app(db_path):
-    from app import create_app  # lazy import — app.py may not exist during Task 2
+    from app import create_app
+
     flask_app = create_app(db_path=db_path)
     flask_app.config["TESTING"] = True
     return flask_app

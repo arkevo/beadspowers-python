@@ -1,7 +1,15 @@
 import sqlite3
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, TypedDict
+
+
+class TaskDict(TypedDict):
+    id: str
+    title: str
+    completed: bool
+    created_at: str
+    updated_at: str
 
 
 def _now_iso() -> str:
@@ -31,7 +39,7 @@ def init_db(db_path: str) -> None:
         conn.close()
 
 
-def _row_to_dict(row) -> dict:
+def _row_to_dict(row: sqlite3.Row) -> TaskDict:
     return {
         "id": row["id"],
         "title": row["title"],
@@ -41,7 +49,7 @@ def _row_to_dict(row) -> dict:
     }
 
 
-def create_task(db_path: str, title: str) -> dict:
+def create_task(db_path: str, title: str) -> TaskDict:
     task_id = str(uuid.uuid4())
     now = _now_iso()
     conn = get_db_connection(db_path)
@@ -57,7 +65,7 @@ def create_task(db_path: str, title: str) -> dict:
         conn.close()
 
 
-def get_all_tasks(db_path: str) -> list[dict]:
+def get_all_tasks(db_path: str) -> list[TaskDict]:
     conn = get_db_connection(db_path)
     try:
         rows = conn.execute("SELECT * FROM tasks ORDER BY created_at ASC").fetchall()
@@ -66,7 +74,7 @@ def get_all_tasks(db_path: str) -> list[dict]:
         conn.close()
 
 
-def get_task(db_path: str, task_id: str) -> Optional[dict]:
+def get_task(db_path: str, task_id: str) -> Optional[TaskDict]:
     conn = get_db_connection(db_path)
     try:
         row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
@@ -80,7 +88,7 @@ def update_task(
     task_id: str,
     title: Optional[str] = None,
     completed: Optional[bool] = None,
-) -> Optional[dict]:
+) -> Optional[TaskDict]:
     task = get_task(db_path, task_id)
     if task is None:
         return None
