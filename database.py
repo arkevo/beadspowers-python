@@ -16,17 +16,19 @@ def get_db_connection(db_path: str) -> sqlite3.Connection:
 
 def init_db(db_path: str) -> None:
     conn = get_db_connection(db_path)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS tasks (
-            id TEXT PRIMARY KEY,
-            title TEXT NOT NULL,
-            completed INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-    """)
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS tasks (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                completed INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def _row_to_dict(row) -> dict:
@@ -43,28 +45,34 @@ def create_task(db_path: str, title: str) -> dict:
     task_id = str(uuid.uuid4())
     now = _now_iso()
     conn = get_db_connection(db_path)
-    conn.execute(
-        "INSERT INTO tasks (id, title, completed, created_at, updated_at) VALUES (?, ?, 0, ?, ?)",
-        (task_id, title, now, now),
-    )
-    conn.commit()
-    row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-    conn.close()
-    return _row_to_dict(row)
+    try:
+        conn.execute(
+            "INSERT INTO tasks (id, title, completed, created_at, updated_at) VALUES (?, ?, 0, ?, ?)",
+            (task_id, title, now, now),
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        return _row_to_dict(row)
+    finally:
+        conn.close()
 
 
 def get_all_tasks(db_path: str) -> list[dict]:
     conn = get_db_connection(db_path)
-    rows = conn.execute("SELECT * FROM tasks ORDER BY created_at ASC").fetchall()
-    conn.close()
-    return [_row_to_dict(r) for r in rows]
+    try:
+        rows = conn.execute("SELECT * FROM tasks ORDER BY created_at ASC").fetchall()
+        return [_row_to_dict(r) for r in rows]
+    finally:
+        conn.close()
 
 
 def get_task(db_path: str, task_id: str) -> Optional[dict]:
     conn = get_db_connection(db_path)
-    row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-    conn.close()
-    return _row_to_dict(row) if row else None
+    try:
+        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        return _row_to_dict(row) if row else None
+    finally:
+        conn.close()
 
 
 def update_task(
@@ -80,19 +88,23 @@ def update_task(
     new_completed = completed if completed is not None else task["completed"]
     now = _now_iso()
     conn = get_db_connection(db_path)
-    conn.execute(
-        "UPDATE tasks SET title = ?, completed = ?, updated_at = ? WHERE id = ?",
-        (new_title, int(new_completed), now, task_id),
-    )
-    conn.commit()
-    row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-    conn.close()
-    return _row_to_dict(row)
+    try:
+        conn.execute(
+            "UPDATE tasks SET title = ?, completed = ?, updated_at = ? WHERE id = ?",
+            (new_title, int(new_completed), now, task_id),
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        return _row_to_dict(row)
+    finally:
+        conn.close()
 
 
 def delete_task(db_path: str, task_id: str) -> bool:
     conn = get_db_connection(db_path)
-    cursor = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
-    conn.commit()
-    conn.close()
-    return cursor.rowcount > 0
+    try:
+        cursor = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()

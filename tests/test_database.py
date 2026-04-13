@@ -71,7 +71,7 @@ def test_update_task_updated_at_changes(db_path):
     task = create_task(db_path, "Task")
     time.sleep(0.01)
     updated = update_task(db_path, task["id"], title="Updated")
-    assert updated["updated_at"] >= task["updated_at"]
+    assert updated["updated_at"] > task["updated_at"]
 
 
 def test_delete_task_removes_it(db_path):
