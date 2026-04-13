@@ -209,6 +209,7 @@ function enterEditMode(row, id) {
       input.focus();
       return;
     }
+    saveBtn.disabled = true;
     try {
       const updated = await apiUpdateTask(id, { title: newTitle });
       const idx = tasks.findIndex((t) => t.id === id);
@@ -216,6 +217,7 @@ function enterEditMode(row, id) {
       activeEditId = null;
       renderTasks();
     } catch (err) {
+      saveBtn.disabled = false;
       showToast("Failed to save edit — please try again.");
     }
   }
