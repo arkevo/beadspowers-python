@@ -148,7 +148,6 @@ If your project already has `.claude/settings.json`, merge these sections from t
   "enabledPlugins": {
     "commit-commands@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true,
-    "codex@openai-codex": true
   }
 }
 ```
