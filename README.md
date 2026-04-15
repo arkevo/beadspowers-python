@@ -95,14 +95,6 @@ bd init
 - **What it provides:** `commit-commands:*` skills (commit, commit-push, commit-push-pr, clean_gone)
 - **Scope:** project
 
-#### 4. Codex (optional)
-
-```
-/install-plugin codex from openai-codex
-```
-
-- **What it provides:** `codex:*` skills — delegate tasks to OpenAI Codex CLI
-- **Scope:** project
 
 ### System Dependencies
 
