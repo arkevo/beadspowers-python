@@ -45,10 +45,10 @@ The router (`beads-workflow-router.md`) enforces this mandatory sequence:
 | "Plan this" | `superpowers:writing-plans` |
 | "Refine the plan" | `plan-refinement-qa` |
 | "Execute the plan" | Execution gate (sequential vs parallel) |
-| "Ship it" | `beads-ship-task` (always creates PR) |
 | "Quick verify" | `python-verification-quick` |
 | "Standard verify" | `python-verification-standard` |
 | "Full verify" | `python-verification-full` |
+| "Ship it" | `beads-ship-task` (always creates PR) |
 
 ## Prerequisites
 
