@@ -293,6 +293,20 @@ Skip this phase - no sensitive files modified.
 
 ---
 
+## Phase 13: Write Verification Marker (ONLY on PASS)
+
+The router's *Hard Stop: Verification Before Ship / "Done"* and `beads-ship-task`
+gate on this marker. Write it ONLY after Phase 11's tests pass — never on failure:
+
+```bash
+TASK=$(python3 -c "import json;print(json.load(open('.beads/.session-state.json')).get('task_id',''))" 2>/dev/null)
+printf '{"level":"standard","task":"%s","passed":true,"at":"%s"}\n' "$TASK" "$(date -u +%FT%TZ)" > .beads/.verification-done
+```
+
+If any phase FAILED, do NOT write the marker (leave any prior one; the gate stays closed).
+
+---
+
 ## Standard Verification Report
 
 ```markdown

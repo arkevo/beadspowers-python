@@ -86,6 +86,20 @@ pytest -v
 
 ---
 
+## Phase 12: Write Verification Marker (ONLY on PASS)
+
+The router's *Hard Stop: Verification Before Ship / "Done"* and `beads-ship-task`
+gate on this marker. Write it ONLY after tests pass — never on failure:
+
+```bash
+TASK=$(python3 -c "import json;print(json.load(open('.beads/.session-state.json')).get('task_id',''))" 2>/dev/null)
+printf '{"level":"quick","task":"%s","passed":true,"at":"%s"}\n' "$TASK" "$(date -u +%FT%TZ)" > .beads/.verification-done
+```
+
+If tests FAILED, do NOT write the marker (leave any prior one; the gate stays closed).
+
+---
+
 ## Quick Verification Report
 
 ```markdown

@@ -17,21 +17,22 @@ namespace:skill-name
 | `commit-push` | `commit-commands:commit-push` |
 | `commit-push-pr` | `commit-commands:commit-push-pr` |
 | `commit` | `commit-commands:commit` |
-| `getIssues` | `sentry:getIssues` |
+| `beads-start-task` | `workflow-commands:beads-start-task` |
 | `stats` | `beads:stats` |
 | `ready` | `beads:ready` |
 
 ### Common Skill Namespaces
 
-| Namespace | Skills |
-|-----------|--------|
-| `commit-commands` | `commit`, `commit-push`, `commit-push-pr`, `clean_gone` |
-| `beads` | `stats`, `ready`, `list`, `show`, `create`, `update`, `close`, `sync`, etc. |
-| `sentry` | `seer`, `getIssues`, `sentry-code-review`, etc. |
-| `superpowers` | `test-driven-development`, `systematic-debugging`, `writing-plans`, etc. |
-| `workflow-commands` | `python-verification-quick`, `python-verification-standard`, etc. |
-| `one-off-commands` | `status`, etc. |
-| `encoding-commands` | `encode-single-test`, `batch-encode-register` |
+| Namespace | Skills | Source |
+|-----------|--------|--------|
+| `commit-commands` | `commit`, `commit-push`, `commit-push-pr`, `clean_gone` | plugin (`commit-commands@claude-plugins-official`) |
+| `superpowers` | `test-driven-development`, `systematic-debugging`, `writing-plans`, etc. | plugin (`superpowers@claude-plugins-official`) |
+| `beads` | `stats`, `ready`, `list`, `show`, `create`, `update`, `close`, `sync`, etc. | plugin (`beads`) |
+| `workflow-commands` | `beads-start-task`, `beads-ship-task`, `plan-refinement-qa`, `plan-summary-console`, `python-verification-quick/standard/full`, `hotfix-interrupt`, `P*-*` phase gates, etc. | local (`.claude/Commands/workflow-commands/`) |
+
+> Only the namespaces above ship with this template. If you add your own local
+> namespace, create it as a kebab-case folder under `.claude/Commands/` and list
+> it here — a skill Claude cannot name is a skill Claude will not invoke.
 
 ### Why This Matters
 
@@ -55,10 +56,9 @@ All skill namespace folders under `.claude/Commands/` **MUST** use `kebab-case`
 
 | Correct | Wrong |
 |---------|-------|
-| `encoding-commands` | `Encoding Commands` |
-| `one-off-commands` | `One off commands` |
 | `workflow-commands` | `Workflow Commands` |
 | `commit-commands` | `Commit Commands` |
+| `writing` | `Writing Commands` |
 
 Claude Code's `/` slash command parser splits on spaces. A namespace like
 `Encoding Commands` causes the parser to treat `Encoding` as the skill name
@@ -70,14 +70,16 @@ Skill `.md` filenames inside namespace folders must also be `kebab-case`:
 
 | Correct | Wrong |
 |---------|-------|
-| `encode-single-test.md` | `Encode Single Test.md` |
-| `python-build-fix.md` | `Python Build Fix.md` |
+| `beads-start-task.md` | `Beads Start Task.md` |
+| `python-verification-quick.md` | `Python Verification Quick.md` |
 
 ### Sub-Namespace Folders
 
-Sub-folders within a namespace (e.g., `one-off-commands/debug/`) also follow
-kebab-case. This creates nested namespaces like
-`one-off-commands:debug:sentry-output`.
+If a namespace ever gets sub-folders (e.g. `workflow-commands/debug/`), they
+also follow kebab-case, creating nested namespaces like
+`workflow-commands:debug:trace-pipeline`. This repo currently has no nested
+skill namespaces — `workflow-commands` is flat, and its `references/` folder
+holds shared assets, not skill sub-namespaces.
 
 ### Checklist for New Skills
 
@@ -89,10 +91,22 @@ Before creating a new skill:
 
 ## Beads Plugin Enforcement
 
-### Rule: Always Use Beads Plugin Skills, Never the `bd` CLI
+### Rule: Prefer Beads Plugin Skills
 
-When performing any Beads operation, **always invoke the corresponding plugin
-skill** via the `Skill` tool. Never run `bd` commands directly in Bash.
+See `.claude/rules/0_Beads x Superpowers/beads-plugin-cli-only.md` — this
+plugin has no MCP layer, so invoking a `beads:*` skill means running the
+`bd` command it names, directly in Bash.
+
+This is a single repo — Beads runs against the local store under `.beads/`.
+There is no multi-repo hub, so **`bd repo sync` is not part of any workflow here.**
+
+**Team sync depends on how your project is set up.** By default beads state
+travels as `issues.jsonl` committed alongside your code, so a normal
+`git commit` + `git push` ships both. If you configure a **Dolt remote**
+instead, beads becomes a **second channel**: sync it at session/task start and
+again at ship/session close (`bd dolt pull` / `bd dolt push`), in addition to
+`git push`. Either way, never `--force` a beads push except a deliberate,
+agreed re-baseline.
 
 ### Skill Mapping
 
@@ -113,16 +127,6 @@ skill** via the `Skill` tool. Never run `bd` commands directly in Bash.
 | Check version | `beads:version` |
 | Show workflow guide | `beads:workflow` |
 | Audit interactions | `beads:audit` |
+| Pull teammate's beads (session/task START) | `git pull` — or `bd dolt pull` on a Dolt remote |
+| Publish your beads (ship / session CLOSE) | `git push` — or `bd dolt push` on a Dolt remote |
 
-### No CLI Exceptions
-
-At beads v0.63.3+, all beads operations are handled through the plugin
-skills. The `bd sync --flush-only` exception from v0.49.4 no longer
-applies — JSONL persistence has been removed and the pre-commit hook
-uses Dolt-native operations automatically.
-
-### Why
-
-The `bd` CLI binary may not be in PATH on all machines. The beads plugin
-skills are always available through Claude Code's Skill tool and provide
-reliable, consistent access to the beads database regardless of environment.

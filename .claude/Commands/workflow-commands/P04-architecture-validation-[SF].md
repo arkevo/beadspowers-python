@@ -2,7 +2,7 @@
 name: python-architect
 description: Analyzes and validates Python application architecture against established patterns, SOLID principles, and project-specific best practices
 version: 1.0.0
-author: mtalkie
+author: beadspowers
 tags:
   - architecture
   - clean-architecture

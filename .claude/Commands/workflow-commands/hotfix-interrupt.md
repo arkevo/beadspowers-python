@@ -53,13 +53,13 @@ git checkout [original-branch] && git stash pop
 Best for: Longer fixes, complex debugging
 
 ```bash
-git worktree add ../mtalkie-hotfix -b hotfix/[description]
-# Work using absolute paths in the worktree: /Users/.../mtalkie-hotfix/lib/...
+git worktree add ../<repo>-hotfix -b hotfix/[description]
+# Work using absolute paths in the worktree: /Users/.../<repo>-hotfix/src/...
 ```
 
 **Return:**
 ```bash
-git worktree remove ../mtalkie-hotfix
+git worktree remove ../<repo>-hotfix
 # Continue in original directory
 ```
 
@@ -79,7 +79,7 @@ Best for: Minor issues, same-branch fixes. No git operations needed. Continue in
 | "Fix it here" | Continue in current branch |
 | "I'm back" / "Back to my task" | Return per approach (checkout + pop stash, or remove worktree) |
 | "Pop my stash" | `git stash pop` |
-| "Remove the worktree" | `git worktree remove ../mtalkie-hotfix` |
+| "Remove the worktree" | `git worktree remove ../<repo>-hotfix` |
 
 ---
 
@@ -87,7 +87,7 @@ Best for: Minor issues, same-branch fixes. No git operations needed. Continue in
 1. Close hotfix bug task via `beads:close`
 2. Return to original task:
    - Stash approach: `git checkout [branch] && git stash pop`
-   - Worktree approach: `git worktree remove ../mtalkie-hotfix`
+   - Worktree approach: `git worktree remove ../<repo>-hotfix`
    - In-place: already there
 3. If interrupted during verification → say "Continue verification" to resume from where you left off
 

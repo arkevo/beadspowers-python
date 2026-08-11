@@ -6,13 +6,23 @@ description: Start a Beads task - mark in_progress, create branch, initialize se
 
 When the user starts a task, execute these steps in order:
 
+## Step 0: Pull Latest Beads (team sync)
+Before anything else, sync the beads store so you start from the team's latest state:
+```bash
+git pull            # default setup: beads travels as issues.jsonl in git
+# bd dolt pull      # Dolt-remote setup: beads is a separate channel
+```
+If a beads pull is rejected as diverged, do **not** `--force` — coordinate or re-pull.
+
 ## Step 1: Mark Task In Progress
-- Run `bd update <id> --status=in_progress` (use beads:update skill)
+- Run `bd update <id> --status=in_progress` (use `beads:update` skill)
 
 ## Step 2: Initialize Session State
-Create/reset `.beads/.session-state.json`:
+Create/reset `.beads/.session-state.json` (include `task_id` so the verification
+marker can record which task it covers):
 ```json
 {
+  "task_id": "<id>",
   "task_requirements": "",
   "plan_created": false,
   "plan_file": "",
@@ -21,32 +31,104 @@ Create/reset `.beads/.session-state.json`:
 }
 ```
 
-## Step 3: Jira Key Lookup
-Before creating the branch, look up linked Jira issue:
+Also clear any stale verification marker from a previous task so it cannot pass
+the ship gate (router *Hard Stop: Verification Before Ship / "Done"*):
+```bash
+rm -f .beads/.verification-done
+```
 
-**Step 3a — Local cache:**
-- Read `.sync/jira-gid-mapping.json` (if exists)
-- Find entry where `beads_id` matches → extract `jira_key`
-- If found → proceed to Step 4
+## Step 3: External Tracker Key (optional)
 
-**Step 3b — Atlassian MCP (fallback):**
-- Load `.sync/jira-config.json` for project key (e.g., `FC`)
-- Use the **Atlassian MCP** tool: `mcp__plugin_atlassian__searchJiraIssuesUsingJql`
-  - JQL: `project = FC AND cf[10157] = "[beads_id]" ORDER BY created DESC`
-  - **NEVER use Asana MCP for Jira lookups** — Asana is not used in this project
-- If found → cache result in `.sync/jira-gid-mapping.json` → proceed to Step 4
-- If Atlassian MCP is unavailable or returns no results → proceed to Step 3c
+**Skip this step unless your project mirrors Beads to an external tracker**
+(Jira, Linear, etc.). Beads is always the source of truth; a tracker key is only
+used to make the branch name greppable from that tracker.
 
-**Step 3c — No match:**
-- Create branch without Jira prefix
-- Inform user: "No Jira issue found for this task."
+If you do mirror: resolve the task's tracker key from whatever mapping your
+mirror maintains, and carry it into the branch name in Step 4. If no key
+resolves, create the branch without one and say so — never block on it.
 
-## Step 4: Create Feature Branch
-If still on main/master:
-- `feature`/`epic`/`task` → `feat/[jira-key-]kebab-case-description`
-- `bug` → `fix/[jira-key-]kebab-case-description`
+## Step 4: Create or Switch to Feature Branch
 
-Examples: `feat/FC-17-task-title-kebab`, `fix/task-title-kebab`
+Before creating anything, **scan existing branches for a match**. Resumable
+tasks (paused multi-phase work, hotfix-interrupted work, tasks where Phase
+1 already merged but the branch is parked awaiting downstream deps) often
+already have a branch — checking it out is correct; creating a duplicate
+silently splits the work in two and is destructive.
+
+### Step 4a — Scan for an existing branch
+
+Run:
+```bash
+git branch --list 'feat/*' 'fix/*' 'refactor/*' 'exp/*' 'hotfix/*' 'chore/*'
+```
+
+Match against the current task using these signals (in priority order):
+1. **Tracker key match:** branch name contains the key resolved in Step 3
+   (e.g. key `AB-17` → matches `feat/AB-17-...`).
+2. **Beads ID match:** branch name contains the task ID slug — both the full
+   form (`<prefix>-m8d9`) and the short form (`m8d9`, the suffix after the
+   project prefix). A task `<prefix>-m8d9.4` matches an unrelated-looking
+   branch name ONLY if the task notes / `bd show` output reference that branch;
+   otherwise check signal 3.
+3. **Title slug match:** branch slug contains **3+ consecutive kebab-case
+   tokens** from the task title (after normalizing to lowercase). Example:
+   task title "Response cache TTL expiry sweep" → tokens
+   `response cache ttl expiry sweep` → matches `feat/response-cache-ttl`.
+4. **Notes-recorded branch:** run `bd show <id>` and grep the output for
+   branch-prefix strings (`ui/`, `fix/`, `backend/`, `stt/`, …). Multi-phase
+   tasks (especially ones where Phase 1 already shipped) often record the
+   branch name in notes.
+
+**Action on match:**
+
+- **Exactly one match** → checkout that branch and skip directly to
+  Step 5:
+  ```bash
+  git checkout <existing-branch>
+  ```
+  Confirm to the user:
+  > 🔁 Resuming task on existing branch: `<existing-branch>`
+
+- **Multiple matches** → list them and ask the user which to use. Do NOT
+  pick one silently.
+
+- **No match** → proceed to Step 4b.
+
+### Step 4b — Branch-state safety check (when no match found)
+
+If you are **not on the trunk** (`master` / `main`) AND no existing branch
+matched in Step 4a, **stop and ask the user before doing anything**:
+
+> ⚠️ Current branch `<current-branch>` does not match task
+> `<task-id>`. I found no existing branch for this task.
+>
+> Options:
+> 1. Checkout the trunk and create a new feature branch for this task.
+> 2. Stay on `<current-branch>` and piggyback this task's commits onto
+>    that branch (only correct if the work genuinely belongs together —
+>    uncommon).
+> 3. Cancel — let me sort out the branch state manually first.
+
+Do NOT silently leave the user on a mismatched branch and start writing
+code there.
+
+### Step 4c — Create a new branch
+
+If on the trunk and no existing branch matched, use a `Git Best Practices/Git Best Practices.md`
+prefix:
+
+| Task area / type | Branch prefix |
+|---|---|
+| New behavior | `feat/` |
+| `bug` | `fix/` |
+| Internal restructuring, no behavior change | `refactor/` |
+| Spike / throwaway prototype | `exp/` |
+| Emergency fix | `hotfix/` |
+| Tooling, CI, `.claude/` rules, docs | `chore/` |
+
+Branch name = `<prefix>/[tracker-key-]kebab-case-description`.
+Examples: `feat/response-cache-ttl`, `fix/null-guard-on-empty-payload`,
+`chore/workflow-router-refresh`.
 
 ## Step 5: Update Workflow Step
 ```bash
@@ -55,18 +137,17 @@ echo "Starting Work" > .beads/.workflow-step
 
 ## Step 6: Confirm
 
-With Jira key:
+With a tracker key:
 > ✅ Marked **bd-xxxx "[Task Title]"** as in_progress.
-> 🌿 Branch: `feat/FC-17-task-title-kebab`
-> 🔗 Jira: FC-17
+> 🌿 Branch: `feat/AB-17-task-title-kebab`
+> 🔗 Tracker: AB-17
 
-Without Jira key:
+Without a tracker key:
 > ✅ Marked **bd-xxxx "[Task Title]"** as in_progress.
 > 🌿 Branch: `feat/task-title-kebab`
-> ℹ️ No Jira issue found for this task.
 
 ## Step 7: Check for Plan
-- Search `docs/plans/` for existing plan matching task (by task ID, title keywords, or related epic)
+- Search `docs/plans/` for an existing plan matching the task (by task ID, title keywords, or related epic)
 - If found → offer:
   > Found existing plan: `docs/plans/[filename]`
   > 1. **Use existing plan** — review and execute this plan
@@ -76,13 +157,13 @@ Without Jira key:
 **IMPORTANT:** When writing a new plan, invoke `superpowers:writing-plans` DIRECTLY.
 Do NOT invoke `superpowers:brainstorming` first — brainstorming is not needed here
 because the Beads task already defines the scope. Skip brainstorming and go straight
-to plan writing.
+to plan writing. Save the plan under `docs/plans/` (per `protect_plans_and_commit_all.md`).
 
 ---
 
 ## "What's Ready?" Scoping Logic
 
-When user asks "What's ready?" or "What should I work on?":
-1. Run `bd list --status=in_progress --type=epic` to find active epic
+When the user asks "What's ready?" or "What should I work on?":
+1. Run `bd list --status=in_progress --type=epic` to find the active epic
 2. Run `bd list --status=open --parent=<epic-id>` for tasks within that epic
-3. Only fall back to `bd ready` if NO epic is in_progress — tell user: "No epic is in progress — showing all unblocked tasks."
+3. Only fall back to `bd ready` if NO epic is in_progress — tell the user: "No epic is in progress — showing all unblocked tasks."
