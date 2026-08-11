@@ -174,14 +174,6 @@ bd init
 - **What it provides:** `commit-commands:*` skills (commit, commit-push, commit-push-pr, clean_gone)
 - **Scope:** project
 
-#### 4. Codex (optional)
-
-```
-/install-plugin codex from openai-codex
-```
-
-- **What it provides:** `codex:*` skills — delegate tasks to OpenAI Codex CLI
-- **Scope:** project
 
 ### System Dependencies
 
@@ -235,7 +227,6 @@ If your project already has `.claude/settings.json`, merge these sections from t
   "enabledPlugins": {
     "commit-commands@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true,
-    "codex@openai-codex": true
   }
 }
 ```
@@ -380,4 +371,4 @@ The exported `settings.json` includes permissions and plugin enables. Review and
 
 - `permissions.allow` — Empty by default; add tool-specific permissions as needed
 - `permissions.deny` — Add safety rails as needed (e.g., prevent destructive commands)
-- `enabledPlugins` — Keep superpowers, codex, and commit-commands; remove any you don't use
+- `enabledPlugins` — Keep superpowers and commit-commands; remove any you don't use
