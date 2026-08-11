@@ -203,6 +203,14 @@ Canonical order of the six `workflow-*` commands:
 
 **Hard stops (these live inside the commands; the router restates them as the authority doc):**
 
+- **Surface a finished-but-unshipped epic before starting new epic work.** An epic
+  whose children are all `ex:done` but which lacks `sh:shipped` has NOT shipped — its
+  tasks and epic stay open, and its code is not on trunk. Check for one at the start of
+  `planning-sequence` / `writing-plans` / `execute-plans` and surface it; also warn
+  before stacking a new epic onto a branch that already carries another epic's unmerged
+  commits. Surface-and-ask, not a hard stop — stacking is sometimes right, but never
+  silently. **A pushed branch is NOT a shipped epic**, and neither is an open PR. See
+  `0_Beads x Superpowers/surface-unshipped-epics.md`.
 - **Budget gate before every fan-out.** No `Workflow` run starts before its Step-2
   preview/confirm. Cost is shown as **% of the 5-hr usage limit**. The model **tier**
   (`opus` / `sonnet` — never a pinned version like `claude-opus-4-8`) is settled
