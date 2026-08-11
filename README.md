@@ -289,7 +289,6 @@ together if your project differs: **PRs are required** (no direct push to
 │       ├── beads-ship-task.md           # Commit, PR, branch cleanup, close task
 │       ├── beads-post-execution.md      # Post-execution verification
 │       ├── beads-export-progress.md     # Regenerate a PROGRESS.md snapshot
-│       ├── beads-import-prd.md          # Import a PRD into beads issues
 │       ├── plan-refinement-qa.md        # Plan Q&A before execution
 │       ├── plan-summary-console.md      # Console recap of the refined plan
 │       ├── hotfix-interrupt.md          # Emergency hotfix flow
