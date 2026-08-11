@@ -3,9 +3,50 @@
 A structured AI-assisted development workflow for Claude Code that combines
 **Beads** (git-backed issue tracking) with **Superpowers** (plan-execute-verify lifecycle) into an enforced sequence.
 
+It ships **two lanes** that share one rule set:
+
 ```
-Start Task -> Plan -> Refine Plan -> Execute -> Verify -> Ship (PR)
+Single-task   Start -> Plan -> Refine -> Execute -> Verify -> Ship (PR)
+Epic-batch    Spec  -> Sequence -> Plan all -> Order -> Build all -> Ship epic
 ```
+
+The **single-task** lane is the default: one Beads task, you in the loop at every
+gate. The **epic-batch** lane takes a whole epic and fans it out across detached
+Claude Workflow runs — one agent per task, worktree-isolated — stopping only at
+budget gates and a few review/smoke/ship gates. Scope picks the lane, not
+phrasing: one task → single-task; an epic or a spec → epic-batch.
+
+## The epic-batch process
+
+![Epic-batch workflow](docs/workflow-process-flow.drawio.png)
+
+*Editable source: [`docs/workflow-process-flow.drawio`](docs/workflow-process-flow.drawio) (the PNG has the diagram XML embedded, so draw.io can open either one).*
+
+| Step | You run | You get |
+|------|---------|---------|
+| **0** | Create a worktree + branch | An isolated workspace |
+| **1** | `superpowers:brainstorming` | A spec / design document |
+| **2** | `/workflow-planning-sequence` | An epic + tasks, classified and ordered into planning waves |
+| **3a** | `/workflow-execute-spikes` *(only if there are `SPIKE-FIRST` tasks)* | Findings files; closing a spike unblocks its `EXEC-GATED` dependents |
+| **3b** | `/workflow-writing-plans` | One approved plan per task (`wp:approved`) |
+| **4** | `/workflow-execution-sequence` | Execution waves + a plan-coverage gate |
+| **5** | `/workflow-execute-plans` | Implemented, QA'd tasks (`ex:done`) |
+| **6** | `/workflow-ship-epic` | One PR for the whole epic (`sh:shipped`) |
+
+**If tasks are left over after step 5,** go back to the phase those tasks are
+actually in — unplanned tasks re-enter at **3b**, unordered ones at **4**. The
+`wp:*` / `sk:*` / `ex:*` / `sh:*` Beads labels tell you where each one stopped,
+which is also what makes a crashed or interrupted run resumable. There is
+deliberately no separate status command.
+
+> ### ⚠️ Context hygiene — applies at every step
+>
+> When your context exceeds roughly **30–50% of 1M**, ask Claude to
+> **"give you a handoff doc for the next session while prioritizing the workflow
+> rules"**, then `/clear` and paste that doc back in to restart with clean
+> context. Long sessions degrade the workflow before they degrade the code — the
+> router and the hard stops are the first things to fall out of an overfull
+> context, and once they do, steps get silently skipped.
 
 ## Features
 
@@ -21,22 +62,43 @@ Python-specific multi-phase verification with three tiers. After execution compl
 
 **Tooling:** ruff (lint/format), mypy (type checking), pytest (tests), python -m build (packaging).
 
+Verification is a **hard gate, not a suggestion**. `beads-ship-task` refuses to
+ship until a `python-verification-{level}` skill has run and written
+`.beads/.verification-done`; in the batch lane the equivalent is a per-task
+`ex:qa:<level>` label. Running `pytest` or `ruff` by hand does **not** satisfy
+either — only the named skill does.
+
 ### Plan Refinement
 
-After Superpowers planning completes, Claude analyzes the plan and asks you 10 questions — a mix of Critical, Recommended, and Nice-to-Have — to refine the plan before execution. Each question includes 3 options with reasoning and a recommendation. Skip at any stage by typing "skip."
+After Superpowers planning completes, Claude analyzes the plan and asks targeted questions — a mix of Critical, Recommended, and Nice-to-Have — to refine the plan before execution. Each question includes options with reasoning and a recommendation. Skip at any stage by typing "skip."
+
+One methodology, two modes: the single-task lane runs it **interactively**
+(`plan-refinement-qa`, live Q&A); the batch lane runs the same engine
+**autonomously** inside `workflow-writing-plans` Step 4, because a detached
+Workflow cannot pause for input. Shared logic lives in
+`Commands/workflow-commands/references/refinement-methodology.md`.
 
 ### Enforced Workflow Sequence
 
-The router (`beads-workflow-router.md`) enforces this mandatory sequence:
+The router (`beads-workflow-router.md`) is the authority document — it outranks
+any "next step" handoff a skill suggests at its own end. It enforces:
 
 1. **Start** — `beads-start-task` marks the issue `in_progress`, creates a feature branch
 2. **Plan** — `superpowers:writing-plans` writes a plan to `docs/plans/`
 3. **Refine** — `plan-refinement-qa` runs Q&A to stress-test the plan
-4. **Execute** — User chooses sequential (`superpowers:executing-plans`) or parallel (`superpowers:subagent-driven-development`)
-5. **Verify** — `beads-post-execution` auto-invokes, presents verification tier options
-6. **Ship** — `beads-ship-task` commits, pushes, creates a PR (with structured description), deletes the branch, closes the beads issue
+4. **Summarize** — `plan-summary-console` prints the refined plan in the console
+5. **Execute** — User chooses sequential (`superpowers:executing-plans`) or parallel (`superpowers:subagent-driven-development`)
+6. **Verify** — `beads-post-execution` auto-invokes, runs the matching verification tier
+7. **Ship** — `beads-ship-task` commits, pushes, opens a PR, closes the beads issue
+
+Plus these hard stops: no direct coding after task start; `systematic-debugging`
+first on `bug` tasks; verification before any ship or "done"; ready-task lists
+scoped to the active epic; and a standing posture that **named scope is
+authorization** (with an explicit hard-lock list that isn't).
 
 ### Natural Language Triggers
+
+**Single-task lane**
 
 | Say This | Invokes |
 |----------|---------|
@@ -44,11 +106,28 @@ The router (`beads-workflow-router.md`) enforces this mandatory sequence:
 | "I'm starting [task]" | `beads-start-task` |
 | "Plan this" | `superpowers:writing-plans` |
 | "Refine the plan" | `plan-refinement-qa` |
-| "Execute the plan" | Execution gate (sequential vs parallel) |
+| "Summarize the plan" | `plan-summary-console` |
+| "Execute the plan" | Execution gate (sequential vs subagent-driven) |
+| "Ship it" | `beads-ship-task` (always opens a PR) |
 | "Quick verify" | `python-verification-quick` |
 | "Standard verify" | `python-verification-standard` |
 | "Full verify" | `python-verification-full` |
-| "Ship it" | `beads-ship-task` (always creates PR) |
+| "I found a critical bug" | `hotfix-interrupt` |
+| "Export progress" | `beads-export-progress` |
+
+**Epic-batch lane** — these need the word *epic* (or a spec) to route here
+
+| Say This | Invokes |
+|----------|---------|
+| "Decompose this spec" / "Sequence the spec" | `workflow-planning-sequence` |
+| "Plan the epic" / "Write all the plans" | `workflow-writing-plans` |
+| "Run the spikes" | `workflow-execute-spikes` |
+| "What order do I ship this epic?" | `workflow-execution-sequence` |
+| "Execute the epic" / "Build the whole epic" | `workflow-execute-plans` |
+| "Ship the epic" | `workflow-ship-epic` |
+
+When scope is genuinely ambiguous, Claude asks before fanning out — the batch
+lane spends real multi-agent budget and a wrong guess is expensive.
 
 ## Prerequisites
 
@@ -168,6 +247,24 @@ bd init
 
 This creates the `.beads/` directory for issue tracking.
 
+### 5. Replace the placeholders
+
+These files are written to work as-is except for a handful of angle-bracket
+placeholders. Search `.claude/` for them and substitute your project's values:
+
+| Placeholder | Replace with |
+|-------------|--------------|
+| `<owner>/<repo>` | Your GitHub repo |
+| `src/<your_package>/` | Your package path |
+| `<project>_test` | Your test database name |
+| `<run-command>` | How your project starts (`python -m yourpkg`, `uvicorn app:main`, a CLI entrypoint…) |
+| `<epic-id>` / `<task-id>` | Illustrative only — no change needed |
+
+Also review the two git conventions the workflow assumes, and relax them
+together if your project differs: **PRs are required** (no direct push to
+`master` / `main`), and branch prefixes are `feat/`, `fix/`, `refactor/`,
+`exp/`, `hotfix/`, `chore/`.
+
 ## What's Included
 
 ```
@@ -179,24 +276,42 @@ This creates the `.beads/` directory for issue tracking.
 │   └── verification-type-analyzer.md    # Type design quality
 ├── Commands/
 │   └── workflow-commands/               # Custom workflow skills
-│       ├── beads-import-prd.md          # Import PRD into beads issues
-│       ├── beads-post-execution.md      # Post-execution verification
-│       ├── beads-ship-task.md           # Commit, PR (structured desc), branch cleanup, close task
 │       ├── beads-start-task.md          # Start task + create branch
-│       ├── python-verification-*.md     # Quick/Standard/Full tiers
-│       ├── hotfix-interrupt.md          # Emergency hotfix flow
-│       ├── P02–P14 phases              # Individual verification phases
+│       ├── beads-ship-task.md           # Commit, PR, branch cleanup, close task
+│       ├── beads-post-execution.md      # Post-execution verification
+│       ├── beads-export-progress.md     # Regenerate a PROGRESS.md snapshot
 │       ├── plan-refinement-qa.md        # Plan Q&A before execution
-│       ├── Planning-context-*.md        # Context injected during planning
-│       └── tdd-test-writer.md           # TDD test scaffolding
+│       ├── plan-summary-console.md      # Console recap of the refined plan
+│       ├── hotfix-interrupt.md          # Emergency hotfix flow
+│       ├── python-verification-*.md     # Quick/Standard/Full tiers
+│       ├── P02–P14 phases               # Individual verification phases
+│       ├── tdd-test-writer.md           # TDD test scaffolding
+│       ├── workflow-planning-sequence.md   # Spec/epic -> classified planning waves
+│       ├── workflow-writing-plans.md       # Fan-out plan authoring + refinement
+│       ├── workflow-execute-spikes.md      # Throwaway prototypes -> findings
+│       ├── workflow-execution-sequence.md  # Execution waves + plan-coverage gate
+│       ├── workflow-execute-plans.md       # Worktree fan-out, TDD, QA, smoke
+│       ├── workflow-ship-epic.md           # Integrate + close a whole epic
+│       └── references/
+│           └── refinement-methodology.md   # Shared refinement engine (both modes)
 ├── hooks/                               # Shell automation scripts
 │   ├── validate-bash.sh                 # Pre-validate bash commands
 │   └── write-safety.sh                  # Prevent writes to protected paths
 ├── rules/
 │   ├── 0_Beads x Superpowers/
-│   │   └── beads-workflow-router.md     # Natural language -> skill router
-│   └── (add project-specific rules here)
-└── settings.json                        # Hook wiring + plugin enables
+│   │   ├── beads-workflow-router.md     # Authority doc: NL -> skill routing + hard stops
+│   │   ├── skill-usage.md               # Fully-qualified skill names + naming conventions
+│   │   ├── beads-plugin-cli-only.md     # The beads plugin has no MCP layer
+│   │   └── bug-must-have-epic.md        # Every bug gets an epic parent
+│   ├── Git Best Practices/
+│   │   ├── Git Best Practices.md        # Branch naming, releases, rollback
+│   │   ├── no-direct-push-to-master.md  # PRs required
+│   │   └── protect_plans_and_commit_all.md  # Plans are permanent; safe staging
+│   └── critical ai agent rule.md        # Hard locks: destructive git, cloud, branches
+├── settings.json                        # Hook wiring + plugin enables
+docs/
+├── workflow-process-flow.drawio         # Editable process diagram
+└── workflow-process-flow.drawio.png     # Rendered, with XML embedded
 ```
 
 ### Verification Phases (Full)
@@ -233,7 +348,22 @@ The verification phases validate against a 5-layer Python architecture:
 
 ### Verification Phases
 
-The P02–P14 phase commands and verification agents are Python-focused, using **ruff** for linting/formatting, **mypy** for type checking, and **pytest** for testing. To adapt for other languages, modify the phase files and agents in `.claude/Commands/workflow-commands/` and `.claude/agents/`.
+The P02–P14 phase commands and verification agents are Python-focused, using **ruff** for linting/formatting, **mypy** for type checking, and **pytest** for testing. To adapt for other languages, modify the phase files and agents in `.claude/Commands/workflow-commands/` and `.claude/agents/`, and rename the `python-verification-*` skills — the router and `beads-post-execution` reference them by name.
+
+### Model tiers in the batch lane
+
+The `workflow-*` commands pin a model **tier** (`opus` / `sonnet`), never a
+version. Tiers resolve to whatever generation the session runs, which is what
+keeps these files from going stale; a versioned id like `claude-opus-4-8` is not
+a valid `opts.model` value and would pin the fan-out to a superseded model. The
+tier is settled configuration — it is never printed in a budget preview and
+never offered to the user as a choice.
+
+### Adding a design-fidelity gate
+
+`workflow-execute-plans` assumes no visual surface. If your project has a UI
+worth checking against a design source, add a stage label between
+`ex:qa:<level>` and `ex:done` and gate on it the same way the QA level is gated.
 
 ### settings.json
 
@@ -241,4 +371,4 @@ The exported `settings.json` includes permissions and plugin enables. Review and
 
 - `permissions.allow` — Empty by default; add tool-specific permissions as needed
 - `permissions.deny` — Add safety rails as needed (e.g., prevent destructive commands)
-- `enabledPlugins` — Keep superpowers, codex, and commit-commands; remove any you don't use
+- `enabledPlugins` — Keep superpowers and commit-commands; remove any you don't use

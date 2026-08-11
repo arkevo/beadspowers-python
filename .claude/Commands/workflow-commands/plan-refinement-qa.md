@@ -4,6 +4,13 @@ description: Plan Refinement Q&A — analyze plan for improvements, ask targeted
 
 # Plan Refinement Q&A
 
+> **Mode: `interactive`.** This is the interactive adapter of the shared Refinement
+> Methodology (`references/refinement-methodology.md`) — live Q&A in main context. The
+> autonomous adapter (auto-select inside a `Workflow`) is `workflow-writing-plans`
+> Step 4. The methodology — decision discovery, tiers, per-decision anatomy,
+> recommendation logic — lives in the engine; this file owns only the interactive
+> delivery.
+
 ## Triggers
 
 - **Auto-trigger** after `superpowers:writing-plans` completes (always, no prompt)
@@ -18,34 +25,17 @@ echo "Plan Refinement" > .beads/.workflow-step
 
 ## Plan Analysis
 
-1. Read the plan file from `docs/plans/` (path from session state `plan_file`)
-2. If Planning Context skill ran earlier in the session, inherit its flagged risks — use those to weight category relevance (don't re-discover the same risks)
-3. Analyze against 10 categories, dynamically ranked by rework cost for THIS specific plan:
-
-| Category | Scores High When... |
-|----------|-------------------|
-| Scope Control | Plan includes work that should be separate tasks, or is too narrow |
-| Architecture | Pattern choices (inheritance vs composition, constructor design) |
-| Error Handling | Missing try-catch, unclear failure modes, silent errors |
-| Testing Strategy | TDD gaps, missing edge case coverage, wrong test types |
-| Data Flow | State management choices, API contracts, unnecessary rebuilds |
-| Integration Points | Breaks existing callers, unclear interfaces |
-| Performance | Unbounded lists, missing caching, expensive build() operations |
-| Edge Cases | Null inputs, empty states, concurrent operations, race conditions |
-| Dependencies | New packages when existing utilities exist, unmaintained deps |
-| File Organization | Files in wrong feature directory, naming inconsistencies |
-
-4. Score each category: **High** (plan has a gap), **Medium** (plan has explicit choice worth validating), **Skip** (irrelevant to this plan)
-5. Select top 5 by score, rank by rework cost
-
-## Difficulty Tier Assignment
-
-Assign each of the 5 selected questions a tier:
-- **Critical** — Wrong decision here causes rework during execution. Architecture, error handling, testing choices that affect multiple files.
-- **Recommended** — Improves quality but isn't load-bearing. Performance optimizations, better naming, additional edge case coverage.
-- **Nice-to-have** — Polish. File organization, documentation approach, minor pattern preferences.
-
-Order questions: Critical first → Recommended → Nice-to-have.
+1. Read the plan file from `docs/plans/` (path from session state `plan_file`).
+2. **Discover, score, tier, and analyze decisions per the shared engine**
+   (`references/refinement-methodology.md` → §Decision Discovery, §Tier Taxonomy,
+   §Per-Decision Anatomy, §Recommendation Logic). The 10-category framework, the
+   High/Medium/Skip scoring, the rework-cost ranking, and the Critical/Recommended/
+   Nice-to-have tiers all live there — do not restate them here.
+3. **Interactive question budget** (this adapter's knob, per §Mode Contract → interactive):
+   **honest, anti-quota.** Queue up to 10 by genuine rework cost; ask the top ~5 this
+   round, continuation gate offers more (soft cap 10). **No forced Critical** — honest
+   tiers, fall through Critical → Recommended → Nice-to-have as real gaps run out; **don't
+   pad** (a small plan may yield fewer than 5). The live user can always ask for more.
 
 ## Q&A Loop
 
@@ -155,17 +145,22 @@ Decisions from plan refinement Q&A on [YYYY-MM-DD]:
    - Set `plan_refinement.questions_asked` and `plan_refinement.questions_answered`
    - Populate `plan_refinement.decisions` array with full detail per decision
 
-## Transition to Execution Gate
+## Transition to Plan Summary (Console)
 
 After plan update:
 ```
 Plan updated: `docs/plans/[filename]`
 [N] refinements applied ([X] critical, [Y] recommended, [Z] nice-to-have).
-
-Ready to execute.
 ```
 
-Then immediately present the execution gate prompt (from execution-option-gate.md):
+Then IMMEDIATELY auto-invoke `workflow-commands:plan-summary-console` (per the beads-workflow-router "Auto-Invoke: Plan Summary In Console After Refinement" rule). Do NOT ask the user — just invoke it. The summary command prints the numbered + bulleted plan recap in the console and then presents the execution gate itself.
+
+**Do NOT present the execution gate from this skill.** The summary command owns that handoff now.
+
+The only bypass is if the user explicitly says "skip summary" or "just execute" — then skip straight to the execution gate below.
+
+### Fallback execution gate (only if summary is bypassed)
+
 ```
 How would you like to execute this plan?
 

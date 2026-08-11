@@ -1,83 +1,126 @@
 ---
-description: Ship completed task - commit, push, close Beads task, check epic completion, sync Jira
+description: Ship a completed task - commit, push the feature branch, close the Beads task, check epic completion
 ---
 
 # Ship Beads Task
+
+Single-repo workflow. There is no multi-repo hub (no `bd repo sync`). Every
+change reaches the trunk (`master` / `main`) through a **PR** — see
+`Git Best Practices/no-direct-push-to-master.md`. If you mirror Beads to an
+external tracker, wire it as a post-`bd close` hook rather than a step here;
+Beads stays the source of truth.
+
+## Step 0: Verification Gate (HARD STOP)
+
+**Refuse to ship until verification has run this session** — see the router's
+*Hard Stop: Verification Before Ship / "Done"*. Check for the marker a
+`python-verification-{level}` skill writes on pass:
+
+```bash
+test -f .beads/.verification-done && cat .beads/.verification-done || echo "NO VERIFICATION MARKER"
+```
+
+- **Marker present** → proceed to Step 1.
+- **Marker absent** → STOP. Do not commit. Tell the user verification has not run
+  and invoke `workflow-commands:beads-post-execution` first (it detects the level
+  and runs the matching `python-verification-{quick,standard,full}` skill, which
+  writes the marker). Ad-hoc `pytest`/smoke does NOT satisfy this — only the named
+  skill writes the marker.
+- **Explicit bypass only:** proceed without the marker ONLY if the user gave a
+  real-time instruction naming the skip ("skip verification", "I'm confident, ship
+  it"). Record the bypass in the commit/PR body. Claude's own "it's a tiny change"
+  is NOT a valid bypass.
+
+> Fan-out (epic-batch) lane: the equivalent gate is the per-task `ex:qa:<level>`
+> label enforced by `workflow-execute-plans` — this Step 0 is the single-task lane's
+> analog.
 
 ## Step 1: Update Workflow Step
 ```bash
 echo "Committing" > .beads/.workflow-step
 ```
 
-## Step 2: Commit and Create PR
-- Always invoke `commit-commands:commit-push-pr`
-- Direct pushes to master are not allowed — all changes must go through a PR
+## Step 2: Commit and Push the Feature Branch
+- **Never commit or push directly to `master` / `main`** — see
+  `Git Best Practices/no-direct-push-to-master.md`. Commit on the feature branch.
+- Stage explicitly (never `git add -A`) per `Git Best Practices/protect_plans_and_commit_all.md`, then commit and push the branch.
+  - Use TDD commit labels when applicable: `RED:` / `GREEN:`.
+- Ship = commit + `git push -u origin <branch>`, then open the PR in Step 3.
+
+## Step 3: Open the PR
+Per `Git Best Practices/no-direct-push-to-master.md`, **all changes reach the
+trunk through a PR** — there is no local-merge option. Invoke
+`commit-commands:commit-push-pr`, using the PR body format below.
 
 ### PR Description Format
 
-The PR body MUST include these sections. Gather the information before creating the PR:
+Gather this before creating the PR:
 
-**Summary:** Write a thorough technical summary of the changes. Group by logical layers or components if the change spans multiple areas. Explain the *what* and *why*, not just file names.
+**Summary:** A thorough technical summary of the changes. Group by component/layer if the change spans multiple areas. Explain the *what* and *why*, not just file names.
 
-**Test Results:** Include test counts (passed/failed), note pre-existing failures separately, count new tests added, and mention any manual verification performed (e.g., smoke tests, cross-repo checks).
+**Test Results:** Test counts (passed/failed), pre-existing failures noted separately, number of new tests added, and any manual verification performed. Note the `RED:`/`GREEN:` commits where TDD applied.
 
-**Beads:** List the epic ID and all task IDs involved in this PR. Use `beads:show` on the current task to get the epic and task IDs.
-
-**Companion PR:** If this PR depends on or is paired with a PR in another repo, link it here. If none, omit this section entirely.
+**Beads:** The epic ID and all task IDs in this PR. Use `beads:show` on the current task to get the epic and task IDs.
 
 Example PR body:
 
 ```markdown
 ## Summary
-Seller-side fix for CPM hallucination. Two layers:
+Add a per-entry TTL to the response cache so stale entries expire instead of
+being served indefinitely.
 
-**Layer 1 (pricing_type enum):** Added PricingType enum (fixed/floor/on_request) to ProductDefinition, Package, QuotePricing, and Pricing models. Made pricing fields Optional when on_request. Defaults to fixed for backward compatibility.
+**Cache layer:** `src/<your_package>/cache.py` — added `ttl_seconds` to `put()`,
+an expiry check in `get()`, and a metrics counter for TTL evictions.
 
-**Layer 4 (quote validation):** Added QuoteHistoryStore that records quotes when issued and cross-references buyer-submitted CPMs against quote history. Proposals with unverified pricing are flagged (pricing_verified=false), not blocked. 1% tolerance for price matching.
+**Config:** `src/<your_package>/config.py` — new `cache_ttl_seconds` setting
+(default 3600).
 
 ## Test Results
-- Layer 1: 638 passed (2 pre-existing failures), 18 new tests
-- Layer 4: 648 passed (2 pre-existing failures), 10 new tests
-- Both layers Quinn VERIFIED independently
-- Cross-repo smoke test: 6/6 scenarios PASS
+- 642 passed (2 pre-existing failures), 9 new tests
+- RED/GREEN commits present for the cache change
+- Manual verification: HIT/MISS behavior confirmed against a local run
 
 ## Beads
-- Epic: `ar-rrgw`
-- Tasks: `ar-7rgy` (Layer 1), `ar-hm9l` (Layer 4)
-
-## Companion PR
-Buyer-side fix (remove fallbacks, pricing provenance, LLM guardrails) in separate PR on `ad_buyer_system`.
+- Epic: `<epic-id>`
+- Tasks: `<task-id>` (TTL), `<task-id>` (config)
 ```
 
-## Step 3: Delete Merged Branch
-After the PR is merged, clean up the branch both remotely and locally:
+## Step 4: Branch Cleanup (after the PR is merged)
+1. `gh pr view <number> --json headRefName -q .headRefName` then `git push origin --delete <branch>`
+   - If the PR was merged with `gh pr merge --delete-branch`, the remote is already gone — skip this.
+2. `git checkout <trunk> && git pull`
+3. `git branch -d <branch>`
 
-1. Delete remote branch: `gh pr view <number> --json headRefName -q .headRefName` then `git push origin --delete <branch>`
-   - If the PR was merged with `gh pr merge --delete-branch`, the remote is already gone — skip this
-2. Switch to master: `git checkout master && git pull`
-3. Delete local branch: `git branch -d <branch>`
+> **Tip:** When merging via `gh pr merge`, pass `--delete-branch` to handle remote cleanup automatically.
 
-> **Tip:** When merging via `gh pr merge`, always pass `--delete-branch` to handle remote cleanup automatically.
+## Step 5: Close Beads Task
+After a successful push:
+- Close the task with a meaningful reason: `bd close <task-id> --reason="[description of what was done]"`
+- Use the `beads:close` skill.
 
-## Step 4: Close Beads Task
-After successful push:
-- Close task with meaningful reason: `bd close <task-id> --reason="[description of what was done]"`
-- Use `beads:close` skill
+## Step 6: Epic Auto-Completion
+After closing the task, check if the parent epic is fully complete:
 
-## Step 5: Epic Auto-Completion
-After closing the task, check if parent epic is fully complete:
+1. Run `bd show <parent-epic-id>` (use `beads:show` skill) to list all child tasks.
+2. If **every child** has status `closed` → close the epic: `bd close <epic-id> --reason="All child tasks completed"`.
+3. Determine the next epic by priority ordering (P0 → P1 → P2 → P3 → P4) among open epics.
+4. Promote the next epic: `bd update <next-epic-id> --status=in_progress` (only if it exists and is currently `open`).
 
-1. Run `bd show <parent-epic-id>` (use `beads:show` skill) to list all child tasks
-2. If **every child** has status `closed` → proceed to close the epic:
-   - `bd close <epic-id> --reason="All child tasks completed"`
-3. Determine next epic using priority ordering (P0 → P1 → P2 → P4) among open epics.
+## Step 6.5: Publish Beads (team sync)
+After all beads mutations (task closed, epic close/promote done), publish so
+teammates get them.
 
-4. Promote next epic: `bd update <next-epic-id> --status=in_progress`
-   - Only if next epic exists and is currently `open`
+**Default setup (`issues.jsonl` in git):** the beads changes are files in your
+repo — stage and commit them with the work in Step 2. Nothing extra to do here.
 
-## Step 6: Sync Jira
-If Jira sync is configured:
-- Invoke `one-off-commands:jira-quick-sync` for closed task + immediate dependents
+**Dolt-remote setup:** beads is a **second channel** and Step 2's `git push`
+did not ship it:
+```bash
+bd dolt pull        # fast-forward first
+bd dolt push        # publish YOUR beads changes
+```
+If the push is rejected as diverged, `bd dolt pull` and retry — never `--force`
+(only for a deliberate, agreed re-baseline).
 
 ## Step 7: Show Unblocked Tasks
 Show what's now unblocked. If an epic is active, scope to that epic's tasks.
@@ -89,6 +132,9 @@ echo "Complete" > .beads/.workflow-step
 
 ## Step 9: Clean Up Session State
 - Delete `.beads/.session-state.json`
+- Delete `.beads/.verification-done` — the marker is per-task; clearing it here
+  (and at task start) prevents a stale marker from passing Step 0's gate for the
+  next task: `rm -f .beads/.verification-done`
 
 ## Step 10: Suggest /clear
 
