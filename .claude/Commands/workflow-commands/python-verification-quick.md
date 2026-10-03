@@ -167,5 +167,6 @@ Invoke this skill when:
 
 - Quick verification is **NOT** comprehensive
 - Use Standard or Full for complex changes
-- Does not run architecture validation, type analysis, or coverage agents
+- Does not run the review agents (type design, silent failures, comments, test
+  coverage) or the Codex pass
 - Suitable for confident, small changes

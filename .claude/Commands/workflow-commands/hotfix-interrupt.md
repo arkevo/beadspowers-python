@@ -10,7 +10,7 @@ When a critical bug is discovered while a task is in_progress, offer three appro
 - User reports critical/P0 bug while task is in_progress
 - User says "This is critical" or "This needs a hotfix"
 - Verification discovers CRITICAL issue:
-  - Phase 3 Bug Scan: CRITICAL severity found
+  - Bug scan (Phase 7 in full, Phase 3 in standard): CRITICAL severity found
   - Phase 7 Silent Failure Hunt: CRITICAL severity with confidence >= 80%
   - Phase 11: Tests fail due to newly discovered bug (not a test bug)
 

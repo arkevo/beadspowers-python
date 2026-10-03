@@ -1,6 +1,6 @@
 ---
 name: python-verification-full
-description: Full 13-phase verification with parallel agents. Use for 200+ line changes or new modules.
+description: Full verification with parallel review agents and a Codex adversarial pass. Use for 200+ line changes or new modules.
 ---
 
 # Python Full Verification Workflow
@@ -8,11 +8,20 @@ description: Full 13-phase verification with parallel agents. Use for 200+ line 
 **Section:** Code Quality
 
 When running verification before completion in this Python project, use the
-combined methodologies from P02-lint-issues-fix, P03-code-review-checks,
-P04-architecture-validation, P05-code-simplification, P06-type-design-analysis,
-P07-silent-failure-hunt, P08-comment-analysis, P12-test-coverage-analysis, and
-P14-security-review. This ensures thorough quality checks before claiming
-work is complete.
+combined methodologies from P02-lint-issues-fix, P03-code-review-checks (rules
+compliance and historical intent only), P06-type-design-analysis (only when the
+change adds a type), P07-silent-failure-hunt (which now carries the bug scan),
+P08-comment-analysis, the Codex adversarial review, P12-test-coverage-analysis,
+and P14-security-review (only when sensitive files changed). This ensures
+thorough quality checks before claiming work is complete.
+
+**Retired: the architecture-validation and code-simplification phases** (once
+Phases 4 and 5, which is why the numbering jumps from 3 to 6). In a downstream
+project that ran this workflow, neither produced a finding in any recorded run,
+at full or standard level, so both were removed from this tier and from
+`workflow-commands:python-verification-standard`, and their command files were
+deleted. Do not re-add them. An architecture review that a task genuinely needs
+is its own task, with its own bead.
 
 ---
 
@@ -20,9 +29,9 @@ work is complete.
 
 **IMPORTANT:** When running `/superpowers:verification-before-completion` in
 **this Python project**, follow this comprehensive workflow that integrates
-eight Python quality methodologies. This workflow is specific to this project
-and should be used whenever verifying completed work before committing or
-creating PRs in this codebase.
+the project's verification methodologies. This workflow is specific to this
+project and should be used whenever verifying completed work before committing
+or creating PRs in this codebase.
 
 ---
 
@@ -118,7 +127,11 @@ files to confirm issues resolved.
 
 ## Phase 3: Code Review Checks (from P03-code-review-checks)
 
-Review ONLY the changed files identified in Phase 1.
+Review ONLY the changed files identified in Phase 1. This phase keeps the two
+checks nothing else covers. The rest of the old P03 checklist moved: the bug
+scan runs in Phase 7 (inside the `verification-silent-failure` agent, with an
+in-context fallback in the Phase 7 section), comment compliance is Phase 8, and
+the test-presence check is part of Phase 11.
 
 ### Check #1: Rules Compliance
 Audit the changes against `.claude/rules/`:
@@ -128,103 +141,16 @@ Audit the changes against `.claude/rules/`:
 - Testing requirements
 - Python best practices defined in rules
 
-### Check #2: Bug Scan
-Shallow scan for obvious bugs:
-- Type annotation issues
-- Missing error handling
-- Incorrect async/await usage
-- Resource management (unclosed files, connections)
-- Thread safety / async issues
-- Resource leaks (unclosed files, database connections)
-
-**Focus on:** Large bugs, not nitpicks. Ignore what linter/analyzer catches.
-
-### Check #3: Historical Context
+### Check #2: Historical Context
 Review context of modified files:
 - Check Beads task description for original intent
 - Review `.beads/.session-state.json` for task requirements
 - Verify changes align with the task's stated goals
+- Respect any TODO/FIXME or "don't modify" guidance in the touched code
 
-### Check #4: Code Comments Compliance
-Read code comments in modified files:
-- Ensure changes comply with any TODO/FIXME guidance
-- Check that existing documentation is still accurate
-- Verify any "don't modify" or warning comments are respected
-
-### Check #5: Test Coverage
-Verify tests exist and pass:
-- Check for corresponding test files
-- Run `pytest <affected_test_files> -v` via Bash
-- Verify edge cases are covered
-
----
-
-## Phase 4: Architecture Validation (from P04-architecture-validation)
-
-Validate architecture ONLY for changed files and their immediate dependencies.
-
-### Layer Compliance Check
-Validate 5-layer architecture:
-
-| Layer | Purpose | Allowed Dependencies |
-|-------|---------|---------------------|
-| **API/CLI** | Routes, CLI commands, entry points | Services, Core |
-| **Services** | Business logic, orchestration | Domain, Data, Core |
-| **Domain** | Core business rules, entities | Core only |
-| **Data** | Repositories, database access | Core only |
-| **Core** | Shared utilities, config | None (leaf layer) |
-
-**Violations to detect:**
-- API/CLI layer importing Data layer directly
-- Data layer containing business logic
-- Circular dependencies between layers
-
-### SOLID Principles Check
-
-| Principle | What to Verify |
-|-----------|----------------|
-| **S**ingle Responsibility | Each module/class has ONE reason to change |
-| **O**pen/Closed | Extend via composition, not modification |
-| **L**iskov Substitution | Subclasses are substitutable |
-| **I**nterface Segregation | Small, focused abstract classes/protocols |
-| **D**ependency Inversion | Depend on abstractions, not concretions |
-
-### Code Quality Standards
-- Functions: **< 20 lines**, single purpose
-- Line length: **<= 88 characters** (ruff default)
-- Naming: snake_case (functions, variables, modules), PascalCase (classes), UPPER_CASE (constants)
-- Error handling: try-except with specific exception types
-- Type hints: Required on all public functions
-- Logging: Use `logging` module (NOT print)
-
----
-
-## Phase 5: Code Simplification Review (from P05-code-simplification)
-
-Focus on recently modified code and evaluate:
-
-### Clarity Enhancements
-- [ ] Reduced unnecessary complexity and deep nesting?
-- [ ] Large functions broken into smaller focused functions?
-- [ ] Using generators or list comprehensions where appropriate?
-- [ ] No expensive operations in hot paths?
-- [ ] Clear variable and function names?
-- [ ] Pattern matching used where it simplifies code?
-- [ ] Explicit code preferred over overly compact solutions?
-
-### Python Standards
-- [ ] Frozen dataclasses used for immutable value types?
-- [ ] Composition preferred over class inheritance?
-- [ ] Proper type hints on all public APIs?
-- [ ] Google-style docstrings for public APIs?
-- [ ] f-strings used instead of string concatenation?
-- [ ] Context managers used for resource management?
-
-### Balance Check (Avoid Over-Simplification)
-- [ ] Not removing helpful abstractions?
-- [ ] Not combining too many concerns?
-- [ ] Proper separation of business logic and I/O maintained?
-- [ ] Code remains easy to debug and extend?
+**Report only what reaches 80% confidence.** In the runs measured in a
+downstream project, this phase never surfaced a defect that Phase 7 did not
+also report, so a clean pass here is one line in the report, not a paragraph.
 
 ---
 
@@ -236,6 +162,78 @@ Focus on recently modified code and evaluate:
 **Parallel Group A** - Can run simultaneously with Phases 7-8 and Codex Adversarial Review.
 
 **Scope:** New or modified classes/types in changed files only.
+
+### Step 0: Gate — launch only when the change adds a type
+
+In the runs measured in a downstream project, this agent mostly returned
+low-severity encapsulation notes, and the one real bug it found was also found
+by Phase 7 in the same run. It earns its cost only on new types, so check the
+changed set before launching it. Run this from the repository root:
+
+```bash
+# snippet: phase6-gate
+# Prints PHASE6_GATE=launch or PHASE6_GATE=skip, with the reason.
+changed="$(python3 -c '
+import json
+try:
+    d = json.load(open(".beads/.session-state.json"))
+except Exception:
+    d = {}
+for p in d.get("modified_files") or []:
+    print(p["path"] if isinstance(p, dict) else p)
+' 2>/dev/null)"
+trunk=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null) || {
+  git remote set-head origin --auto >/dev/null 2>&1
+  trunk=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)
+}
+if [ -z "$changed" ]; then
+  echo "PHASE6_GATE=launch (changed set unknown)"
+elif [ -z "$trunk" ]; then
+  echo "PHASE6_GATE=launch (no origin/HEAD, so committed changes cannot be checked)"
+else
+  src_files=()
+  while IFS= read -r f; do
+    case "$f" in src/*.py) ;; *) continue ;; esac
+    case "/$f" in */tests/*|*/test_*.py|*_test.py|*/conftest.py) continue ;; esac
+    src_files+=("$f")
+  done <<< "$changed"
+  count=0
+  if [ "${#src_files[@]}" -gt 0 ]; then
+    count=$(
+      {
+        git diff --unified=0 "$trunk"...HEAD -- "${src_files[@]}"
+        git diff --unified=0 HEAD -- "${src_files[@]}"
+        git ls-files --others --exclude-standard -z -- "${src_files[@]}" |
+          while IFS= read -r -d '' f; do git diff --unified=0 --no-index /dev/null "$f"; done
+      } 2>/dev/null |
+        grep -E '^\+[^+]' |
+        grep -vE '^\+[[:space:]]*#' |
+        grep -vE '^\+[[:space:]]*class[[:space:]]+Test' |
+        grep -cE '^\+[[:space:]]*class[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*([(:]|\[)|^\+[[:space:]]*type[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*(\[[^]]*\])?[[:space:]]*=|:[[:space:]]*([A-Za-z_][A-Za-z0-9_]*\.)?TypeAlias[[:space:]]*=|=[[:space:]]*([A-Za-z_][A-Za-z0-9_]*\.)?(NewType|TypedDict|NamedTuple)[[:space:]]*\('
+    )
+  fi
+  if [ "${count:-0}" -gt 0 ]; then
+    echo "PHASE6_GATE=launch ($count added type definition(s) under src/)"
+  else
+    echo "PHASE6_GATE=skip (no new types)"
+  fi
+fi
+```
+
+- `PHASE6_GATE=skip` → do not launch the type-design agent. Report
+  `Type design: Skipped (no new types)` and launch only the Phase 7 and
+  Phase 8 agents, plus Codex.
+- `PHASE6_GATE=launch` → launch it with the others (Agent Orchestration).
+
+The gate counts added lines under `src/` that define a type: a `class`, a
+`TypeAlias` annotation, a `type X = …` statement, or a `NewType`, `TypedDict`
+or `NamedTuple` call. It reads every tree state: commits on this branch
+(`<trunk>...HEAD`), staged and unstaged edits (against `HEAD`), and untracked
+files. Comments, import lines and test classes (`class Test…`, and anything
+under `tests/` or named `test_*.py`, `*_test.py` or `conftest.py`) don't count.
+When the changed set is unknown, or there is no `origin/HEAD` to diff committed
+work against, it launches the agent anyway, because it cannot rule out a new
+type.
 
 ### Step 1: Identify Types to Analyze
 From Phase 1 changed files, identify:
@@ -280,7 +278,7 @@ Only report types with:
 
 **Parallel Group A** - Can run simultaneously with Phases 6, 8, and Codex Adversarial Review.
 
-**Scope:** Error handling code in changed files only.
+**Scope:** Error handling code in changed files only, plus the bug scan in Step 4.
 
 ### Step 1: Identify Error Handling Code
 In changed files, locate:
@@ -307,12 +305,35 @@ For each fallback value found:
 - Does the user get feedback about the failure?
 - Could the failure cascade to worse problems?
 
-### Step 4: Report Issues
+### Step 4: Bug Scan
+The `verification-silent-failure` agent runs this scan as its Step 1.5. When the
+agent fails and this phase falls back to in-context analysis (see Fallback
+Behavior), run it here instead, so the bug scan is never lost. Report real
+paths, not theoretical ones, and skip anything ruff or mypy already reports
+under the project's configuration:
+
+- **None handling:** attribute access, indexing or calls on a value that can be
+  `None` on a real path; `cast()` or `# type: ignore` hiding it; `assert` as
+  the only runtime guard; attributes first assigned outside `__init__`; falsy
+  values treated as missing.
+- **Async misuse:** coroutines never awaited; `create_task()` results not kept;
+  blocking calls inside `async def`; `CancelledError` swallowed; resources used
+  after their `with` block closed them.
+- **Resource lifecycle:** files, sockets, connections, sessions, HTTP clients,
+  `subprocess.Popen`, executors or pools opened without `with`/`finally`; locks
+  without a release in `finally`; threads never joined.
+- **Shared mutable state:** mutable default arguments and class attributes;
+  unlocked state shared across threads or tasks; a collection mutated while
+  iterating it; late-binding closures in loops.
+- **Silent wrong results:** a generator consumed twice; naive and aware
+  datetimes mixed.
+
+### Step 5: Report Issues
 Format for each issue:
 ```
 Location: file:line
 Severity: CRITICAL/HIGH/MEDIUM
-Pattern: [what was found]
+Pattern: [what was found; for a bug-scan finding, "bug scan: <class>"]
 Hidden Errors: [what gets silently dropped]
 User Impact: [how user is affected]
 Recommendation: [how to fix]
@@ -366,49 +387,148 @@ For each comment, cross-reference against actual code:
 
 ---
 
-## Phase 8.7: Codex Adversarial Review (GPT-5.4)
+## Phase 8.7: Codex Adversarial Review
 
-> **EXTERNAL AGENT:** Runs via Codex CLI in parallel with Phases 6-8.
+> **EXTERNAL AGENT:** Runs via the Codex CLI in parallel with Phases 6-8.
 > See [Agent Orchestration](#agent-orchestration) for execution details.
 
 **Parallel Group A** - Launches alongside the Claude verification agents.
 
-**Purpose:** Independent adversarial review from a different AI model (GPT-5.4).
-Codex defaults to skepticism and targets failure modes that static analysis and
-Claude's agents may miss: auth boundaries, data corruption, race conditions,
-rollback safety, stale state, and observability gaps.
+**Purpose:** An independent adversarial review from a different AI model: the
+model configured in your Codex config, run through the Codex CLI. Codex defaults
+to skepticism and targets failure modes that static analysis and Claude's
+agents may miss: auth boundaries, data corruption, race conditions, rollback
+safety, stale state, and observability gaps.
 
 ### Execution
 
-Launch Codex adversarial review in background via Bash (runs in parallel with
-Claude agents — does NOT block them):
+**1. Find the companion script.** The Codex plugin installs it in a versioned
+directory, so never hard-code the path; take the newest installed version:
 
 ```bash
-node "/Users/arkevo/.claude/plugins/cache/openai-codex/codex/1.0.2/scripts/codex-companion.mjs" adversarial-review --background
+# snippet: codex-companion
+COMPANION="$(ls -d ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs 2>/dev/null | sort -V | tail -1)"
+if [ -f "$COMPANION" ]; then
+  echo "Codex companion: $COMPANION"
+else
+  COMPANION=""
+  echo "Codex companion: not found (is the codex plugin installed?)"
+fi
 ```
 
-**Note:** Use `--background` so it runs concurrently. Check results later with:
+If it is not found, Codex is unavailable: note it (Codex Availability Handling,
+in Agent Orchestration) and continue without this phase.
+
+**2. Pick the review scope from the tree state.** Never rely on the companion's
+own `auto` scope. Verification usually runs before the ship commit, so a review
+that looks only at commits can approve a diff that leaves out the uncommitted
+implementation; and on a clean tree, `auto` diffs against the local default
+branch, which can lag or lead the trunk. This block defines `codex_scopes`,
+which prints one line of scope arguments per review pass:
 
 ```bash
-node "/Users/arkevo/.claude/plugins/cache/openai-codex/codex/1.0.2/scripts/codex-companion.mjs" result --json
+# snippet: codex-scope
+codex_scopes() {
+  local trunk dirty ahead=0
+  trunk=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null) || {
+    git remote set-head origin --auto >/dev/null 2>&1
+    trunk=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)
+  }
+  dirty=$(git status --porcelain)
+  if [ -n "$trunk" ]; then
+    ahead=$(git rev-list --count "$trunk..HEAD" 2>/dev/null || echo 0)
+  fi
+  if [ -n "$dirty" ]; then
+    echo "--scope working-tree"
+  fi
+  if [ -n "$trunk" ]; then
+    if [ -z "$dirty" ] || [ "$ahead" -gt 0 ]; then
+      echo "--scope branch --base $trunk"
+    fi
+  elif [ -z "$dirty" ]; then
+    echo "--scope branch"
+  else
+    echo "codex-scope: no origin/HEAD, so commits already on this branch are not reviewed" >&2
+  fi
+}
 ```
+
+- **Dirty tree** (staged, unstaged or untracked changes): one pass with
+  `--scope working-tree`.
+- **Clean tree:** one pass with `--scope branch --base <trunk>`.
+- **Mixed state** (uncommitted edits on top of commits this branch already
+  made): both passes. Merge their findings before Phase 9.
+- **No `origin/HEAD`:** a clean tree gets `--scope branch`, which diffs against
+  the local default branch; a dirty tree gets only the working-tree pass, and
+  the commits already on the branch go unreviewed. Say so in the report.
+- **Never pass `--base` together with `--scope working-tree`.** `--base` forces
+  a branch review and silently drops the uncommitted work.
+
+**3. Launch** one background pass per scope line, in the same Bash call as
+steps 1 and 2:
+
+```bash
+[ -n "$COMPANION" ] && codex_scopes | while IFS= read -r scope; do
+  printf '%s\n' "$scope" | xargs node "$COMPANION" adversarial-review --background
+done
+```
+
+Each launch prints `… started in the background as <jobId>. …`. Keep every
+job id: results are collected by id.
 
 ### Collecting Results
 
-After Phases 6-8 agents return, check if Codex has completed:
+After the Phase 6-8 agents return, collect each pass by its job id, one call
+per pass, with the `codex-companion` block run first in the same Bash call so
+that `$COMPANION` is set. Never call `result` without an id: it returns the
+newest *finished* job, so while a second pass is still running it hands back
+the first pass's verdict again and the other scope goes unreviewed.
 
-1. Run the `result` command above
-2. Parse the JSON response for `verdict` and `findings`
-3. If Codex is still running, proceed with Phase 8.5 (apply agent edits) and
-   check Codex again before Phase 9
-4. If Codex timed out or failed, note in report as "Codex review: unavailable"
+```bash
+node "$COMPANION" result <jobId> --json | jq '{status: .storedJob.status, scope: .storedJob.result.target.label, verdict: .storedJob.result.result.verdict, findings: ((.storedJob.result.result.findings // []) | length), parseError: .storedJob.result.parseError}'
+```
+
+1. If the command says the job "is still running", proceed with Phase 8.5 and
+   collect it again before Phase 9.
+2. Check that `scope` matches the pass you launched (`working tree diff` for
+   `--scope working-tree`, `branch diff against <trunk>` for a branch pass)
+   before merging its findings. A mismatch means you collected the wrong job.
+3. A non-null `parseError` means Codex answered with prose instead of the JSON
+   it was asked for. Treat that pass as a failed run.
+4. Record each pass's scope next to its verdict in the Phase 13 report, one
+   line per pass.
+5. If Codex timed out or failed, follow Codex Availability Handling in Agent
+   Orchestration.
+
+### Runtime Rules
+
+- **Run `codex --version` before blaming the plugin.** The companion runs
+  whichever `codex` binary is first on `PATH`, and that binary reads your Codex
+  config (`~/.codex/config.toml`). A CLI older than its config fails at
+  startup, which looks like a broken plugin.
+- **A config or effort rejection:** fix what `codex --version` or the error
+  shows, then relaunch once. Do not loop.
+- **A usage-limit message:** do not retry. Note the reset time the message
+  gives in the report.
+- **No `bd` writes while a pass is in flight.** The review runs inside the
+  repository with its agent instructions, may run `bd` commands of its own, and
+  two `bd` processes at once can overwrite each other's writes.
+- **A reply that is not JSON is a failed run**, even when the job reports
+  `completed`.
+- **Effort comes from your Codex config.** The review command takes no effort
+  flag. For a deliberately deeper pass (an auth, migration or payment diff),
+  raise `model_reasoning_effort` in the Codex config for that run, put it back
+  afterwards, and name the effort in the report.
 
 ### Codex Finding Format
 
-Codex returns structured JSON with:
+The review sits at `.storedJob.result.result` in the `result --json` reply:
 - `verdict`: `approve` or `needs-attention`
-- `findings`: array of issues with `file`, `line_start`, `line_end`,
-  `confidence` (0-1), `body`, and `recommendation`
+- `summary`: a short overall assessment
+- `findings`: array of issues with `severity` (`critical`, `high`, `medium` or
+  `low`), `title`, `body`, `file`, `line_start`, `line_end`, `confidence`
+  (0-1) and `recommendation`
+- `next_steps`: array of suggested follow-ups
 
 ### Merging Codex Findings
 
@@ -417,12 +537,13 @@ Map Codex findings into the unified findings list:
 - `needs-attention` verdict → treat findings as HIGH severity minimum
 - Apply the same Phase 10 false-positive filtering to Codex findings
 - Deduplicate against Claude agent findings (same file + overlapping lines)
+- When two passes ran, merge both result sets before Phase 9
 
 ---
 
 ## Phase 9: Confidence Scoring
 
-For each issue found (from Phases 3-8 and Codex 8.7), assign a confidence score:
+For each issue found (from Phases 3, 6-8 and Codex 8.7), assign a confidence score:
 
 | Score | Meaning |
 |-------|---------|
@@ -458,6 +579,12 @@ Run final verification sequence:
 3. `pytest -v` via Bash - Execute all tests
 
 **All must pass before claiming completion.**
+
+**Test presence (moved here from Phase 3).** For each changed module under
+`src/`, confirm that a corresponding test file exists under `tests/` (mirror
+structure: `tests/test_billing.py` for `src/<your_package>/billing.py`) and
+that step 3 ran it. A changed module with no test file is reported here;
+Phase 12 rates the gap and may propose the missing tests.
 
 ---
 
@@ -606,19 +733,52 @@ Run `pytest -v` via Bash to execute ALL tests (existing + newly created).
 
 ## Phase 14: Security Review (from P14-security-review)
 
-**Auto-triggers for sensitive files.** Always runs in Full verification.
+**Gated: Steps 2 and 3 run only when Step 1 matches.**
+`workflow-commands:python-verification-standard` uses the same gate. Run
+unconditionally, this phase produced no findings in the runs measured in a
+downstream project, so the gate keeps it as a backstop for the files where it
+can matter. Its triggers cover everything Steps 2 and 3 look for, so a change
+that only adds a `pickle.loads` call, or only edits a migration, still
+triggers it.
 
-### Step 1: Check for Sensitive File Patterns
+### Step 1: Gate on Sensitive Files
 
-Scan changed files for security-relevant patterns:
+Check every file in the Phase 1 changed set against these patterns.
 
 **Path patterns:**
-- `src/**/auth/**`, `src/**/api/**`, `src/**/service/**`
-- `src/**/repository/**`, `src/**/network/**`
+- `src/**/auth/**`, `src/**/api/**`, `src/**/service*/**`
+- `src/**/repository/**`, `src/**/network/**`, `src/**/http/**`
+- `**/migrations/**`, `alembic/versions/**`, `**/*.sql`
+- Settings modules: `**/settings.py`, `**/settings/**`
+- Environment files: `.env`, `.env.*`
 
-**Content patterns:**
-- `apiKey`, `secret`, `token`, `password`, `credential`
-- `http`, `requests`, `httpx`
+**Content patterns** (anywhere in a changed file):
+- Secrets: `api_key`, `apiKey`, `secret`, `token`, `password`, `credential`
+- Network: `http`, `requests`, `httpx`
+- Risky calls: `eval(`, `exec(`, `pickle`, `yaml.load`, `subprocess`,
+  `shell=True`, `verify=False`, `DEBUG`, `random.`
+- Database authorization: `GRANT`, `REVOKE`, `CREATE POLICY`,
+  `ROW LEVEL SECURITY`, `SECURITY DEFINER`
+
+Run this from the repository root. It prints each matching file once:
+
+```bash
+python3 -c 'import json; [print(p) for p in json.load(open(".beads/.session-state.json")).get("modified_files") or []]' 2>/dev/null |
+while IFS= read -r f; do
+  if printf '%s\n' "$f" | grep -qE '(^|/)src/(.*/)?(auth|api|service[^/]*|repository|network|http)/|(^|/)migrations/|(^|/)alembic/versions/|\.sql$|(^|/)settings(\.py$|/)|(^|/)\.env(\..+)?$'; then
+    echo "$f"
+  elif [ -f "$f" ] && grep -qE 'api_key|apiKey|secret|token|password|credential|http|requests|httpx|eval\(|exec\(|pickle|yaml\.load|subprocess|shell=True|verify=False|DEBUG|random\.|GRANT|REVOKE|CREATE POLICY|ROW LEVEL SECURITY|SECURITY DEFINER' -- "$f"; then
+    echo "$f"
+  fi
+done
+```
+
+- **No file printed** → skip Steps 2 and 3. Report
+  `Security review: Skipped (no sensitive files)` and continue.
+- **Files printed** → run Steps 2 and 3 on them, and report
+  `Security review: Triggered (<matching files>)`.
+- **`CHANGED_SET = UNKNOWN`** → run Steps 2 and 3 on the files the review
+  phases covered, and report `Security review: Triggered (changed set unknown)`.
 
 ### Step 2: Python-Specific Security Checks
 
@@ -637,6 +797,7 @@ Scan for these dangerous patterns in changed files:
 | Debug mode leaks | `DEBUG=True` in production configuration |
 | SQL injection | String-formatted queries instead of parameterized |
 | Weak randomness | `random` module used for security-sensitive values (use `secrets` instead) |
+| Database authorization | `GRANT`, `REVOKE`, row-level-security policies or `SECURITY DEFINER` in a migration or `.sql` file: no grant or policy wider than the change needs, policy predicates that name the requesting user, and the application-side check the policy backs still in place |
 
 ### Step 3: Error Exposure Check
 
@@ -671,8 +832,6 @@ After all reviews, provide a structured report:
 ```markdown
 ## Verification Report
 
-### Architecture Score: X/10
-
 ### Summary
 Found [N] issues before completion.
 
@@ -692,32 +851,9 @@ Found [N] issues before completion.
 
 #### Issue 1: [Brief description]
 **Confidence:** [score]%
-**Source:** [rules compliance / bug scan / historical / etc.]
+**Source:** [rules compliance / historical intent]
 **File:** `path/to/file.py:line`
 **Suggested fix:** [how to resolve]
-
----
-
-### Architecture Violations (P04-architecture-validation)
-
-| Layer | Status | Issue |
-|-------|--------|-------|
-| API/CLI | OK/WARN | Description |
-| Services | OK/WARN | Description |
-| Domain | OK/WARN | Description |
-| Data | OK/WARN | Description |
-| Core | OK/WARN | Description |
-
-#### Critical Violation: [type] in `file:line`
-[Description and suggested fix]
-
----
-
-### Simplification Opportunities (P05-code-simplification)
-
-1. **[File/Function]:** [Opportunity description]
-   - Before: [brief description]
-   - After: [suggested improvement]
 
 ---
 
@@ -727,17 +863,17 @@ Found [N] issues before completion.
 |------|------|-------|-----------|-------|
 | ClassName | path:line | 5/10 | 4/10 | Description |
 
-*Or: No type design issues found / Skipped (already run)*
+*Or: No type design issues found / Skipped (no new types) / Skipped (already run)*
 
 ---
 
-### Silent Failure Issues (P07-silent-failure-hunt)
+### Silent Failure and Bug-Scan Issues (P07-silent-failure-hunt)
 
 | Severity | Location | Issue | Recommendation |
 |----------|----------|-------|----------------|
 | CRITICAL | path:line | Bare except: pass | Add logging.exception() |
 
-*Or: No silent failures found / Skipped (already run)*
+*Or: No silent failures or bugs found / Skipped (already run)*
 
 ---
 
@@ -751,15 +887,15 @@ Found [N] issues before completion.
 
 ---
 
-### Codex Adversarial Review (P8.7 — GPT-5.4)
+### Codex Adversarial Review (P8.7)
 
-**Verdict:** [approve / needs-attention / unavailable]
+**Verdict:** [approve / needs-attention / unavailable] · **Scope:** [working tree diff / branch diff against <trunk>; one line per pass] · **Effort:** [optional: the effort your Codex config ran at]
 
 | Confidence | File | Lines | Issue | Recommendation |
 |------------|------|-------|-------|----------------|
 | 0.85 | path/to/file.py | 42-58 | Race condition in... | Add mutex or... |
 
-*Or: No adversarial findings / Codex review: unavailable*
+*Or: No adversarial findings / Codex review: unavailable — [reason]*
 
 ---
 
@@ -783,7 +919,7 @@ Found [N] issues before completion.
 
 ### Security Review (P14-security-review)
 
-**Status:** [Triggered (sensitive files found) | Skipped (no sensitive files)]
+**Status:** [Triggered (<matching files>) | Skipped (no sensitive files)]
 
 | Severity | Location | Issue | Recommendation |
 |----------|----------|-------|----------------|
@@ -803,25 +939,17 @@ Found [N] issues before completion.
 
 All checks passed.
 
-### Architecture Score: X/10
-
 ### Checks Completed:
 - Lint issues (analyzed; auto-fixed inside the changed set only)
 - Rules compliance (.claude/rules/)
-- Bug scan (type hints, async, resource management)
 - Historical context (Beads context)
-- Code comments compliance
-- Test coverage verification
-- Layer separation (API/CLI/Services/Domain/Data/Core)
-- SOLID principles
-- Code simplification review
-- Type design analysis
-- Silent failure hunt
+- Type design analysis (run / skipped: no new types)
+- Silent failure hunt, including the bug scan
 - Comment accuracy
-- Codex adversarial review (GPT-5.4 independent review)
+- Codex adversarial review (independent second model; scope and effort noted)
 - Build validation (environment and package build checked)
-- Test coverage quality
-- Security review (sensitive files checked)
+- Test presence and test coverage quality
+- Security review (triggered / skipped: no sensitive files)
 
 **Ready for:** commit / PR creation
 ```
@@ -837,7 +965,7 @@ Claude should offer options for handling the hotfix.
 ### When to Trigger
 
 Offer hotfix options when ANY of these occur:
-- Phase 3 Bug Scan: CRITICAL severity issue found
+- Phase 7 bug scan (moved there from Phase 3): CRITICAL severity issue found
 - Phase 7 Silent Failure Hunt: CRITICAL severity with confidence >= 80%
 - Phase 11: Tests fail due to a newly discovered bug (not a test bug)
 - Any phase discovers a P0/P1 production issue
@@ -955,54 +1083,50 @@ When any phase discovers a CRITICAL/P0 issue during verification, automatically
 show the hotfix options prompt (see "Hotfix Discovered During Verification"
 section above) before continuing with the report.
 
-**Note:** This 13-phase workflow is tailored to this Python project's
+**Note:** This workflow is tailored to this Python project's
 architecture and rules. Other projects may have different verification
 workflows.
 
 ---
 
-## Quick Reference: The 14 Phases
+## Quick Reference: The Phases
 
 | Phase | Source | Description | Execution |
 |-------|--------|-------------|-----------|
-| 1 | - | Gather context (changed files, rules, summary) | Main context |
-| 2 | P02-lint-issues-fix | ruff check + mypy, auto-fix, manual fix lint issues | Main context |
-| 3 | P03-code-review-checks | 5 review checks (rules, bugs, history, comments, tests) | Main context |
-| 4 | P04-architecture-validation | Layer/SOLID/architecture validation | Main context |
-| 5 | P05-code-simplification | Clarity, Python standards, balance review | Main context |
-| 6 | `verification-type-analyzer` | Type design quality (encapsulation, invariants) | **AGENT (parallel)** |
-| 7 | `verification-silent-failure` | Error handling audit (silent failures) | **AGENT (parallel)** |
+| 1 | - | Gather context (changed set, rules, summary) | Main context |
+| 2 | P02-lint-issues-fix | ruff check + mypy, auto-fix (**changed files only**), manual fix lint issues | Main context |
+| 3 | P03-code-review-checks | Rules compliance + historical intent (bug scan moved to Phase 7) | Main context |
+| 6 | `verification-type-analyzer` | Type design quality — only when the change adds a type | **AGENT (parallel, gated)** |
+| 7 | `verification-silent-failure` | Error handling audit (silent failures) + bug scan | **AGENT (parallel)** |
 | 8 | `verification-comment-analyzer` | Documentation accuracy verification | **AGENT (parallel)** |
-| 8.7 | Codex adversarial-review | Independent adversarial review (GPT-5.4) | **CODEX (parallel)** |
-| 8.5 | - | Apply agent edits, collect Codex results, format | Main context |
+| 8.7 | Codex adversarial-review | Independent adversarial review by a second model | **CODEX (parallel)** |
+| 8.5 | - | Apply agent edits, collect Codex results, scoped format | Main context |
 | 9 | P03-code-review-checks | Confidence scoring (0-100 scale) | Main context |
 | 10 | P03-code-review-checks | False positive filtering (>=80 only) | Main context |
-| 11 | - | Final Verification: ruff check + ruff format + pytest | Main context |
+| 11 | - | Final Verification: ruff check + ruff format --check + pytest + test presence | Main context |
 | 11.5 | P11.5-build-validation | Python build validation (environment + package) | Main context |
 | 12 | `verification-test-coverage` | Test coverage quality analysis | **AGENT (sequential)** |
 | 13 | Combined | Comprehensive verification report | Main context |
-| 14 | P14-security-review | Security audit (auto-triggers for sensitive files) | Main context |
+| 14 | P14-security-review | Security audit — only when sensitive files changed | Main context (gated) |
 
-**Parallel Agents (6-8):** Launch in a SINGLE Task tool call with 3 invocations.
+**Parallel Agents (6-8):** Launch in a SINGLE Task tool call with 2-3 invocations (Phase 6 only when its gate passes).
 **Codex (8.7):** Launch via Bash `--background` in the SAME message as agents.
 **Sequential Agent (12):** Launch after Phase 11 passes.
 
 ---
 
-## The 9 Integrated Methodologies
+## Integrated Methodologies
 
 | Methodology | Focus Area |
 |-------------|------------|
-| **P02-lint-issues-fix** | Static analysis, auto-fix, manual lint fixes |
-| **P03-code-review-checks** | Bug detection, rules compliance, historical context, confidence scoring |
-| **P04-architecture-validation** | Layer separation, SOLID, architecture patterns |
-| **P05-code-simplification** | Clarity, Python standards, avoiding over-simplification |
-| **P06-type-design-analysis** | Type encapsulation, invariants, type hints, Python patterns |
-| **P07-silent-failure-hunt** | Error handling audit, silent failures, fallback behavior |
+| **P02-lint-issues-fix** | Static analysis, scoped auto-fix, manual lint fixes |
+| **P03-code-review-checks** | Rules compliance, historical context, confidence scoring |
+| **P06-type-design-analysis** | Type encapsulation, invariants, type hints, Python patterns (gated on new types) |
+| **P07-silent-failure-hunt** | Error handling audit, silent failures, fallback behavior, bug scan |
 | **P08-comment-analysis** | Documentation accuracy, docstring compliance, comment rot |
-| **Codex adversarial-review** | Independent GPT-5.4 adversarial review: auth, data safety, races, rollback |
+| **Codex adversarial-review** | Independent adversarial review by a second model: auth, data safety, races, rollback |
 | **P12-test-coverage-analysis** | Test coverage quality, gap analysis, edge case coverage |
-| **P14-security-review** | Security audit, secrets, HTTPS, dynamic code execution, deserialization security |
+| **P14-security-review** | Security audit (gated): secrets, HTTPS, dynamic code execution, deserialization, database authorization |
 
 ---
 
@@ -1018,8 +1142,6 @@ for reading AND for writing. The binding rule is
   for context, but it reports findings only for the changed set.
 - Lint analysis: changed files only
 - Code review: changed files only
-- Architecture validation: changed files + immediate dependencies
-- Simplification review: changed files only
 - Type design analysis: new/modified types in changed files only
 - Silent failure hunt: error handling in changed files only
 - Comment analysis: comments in changed files only
@@ -1091,7 +1213,6 @@ This prevents redundant analysis automatically while preserving state across
 - **High confidence only** - Report issues with >=80% confidence
 - **Actionable feedback** - Provide suggested fixes, not just problems
 - **Respect existing decisions** - Check git history before flagging
-- **Preserve functionality** - Simplification suggestions must not change behavior
 - **Balance** - Avoid over-engineering and over-simplification
 - **Scope to changes** - Never expand beyond the changed files
 - **Parallel when possible** - Run Phases 6-8 concurrently to save time
@@ -1113,43 +1234,46 @@ conflicts).
 | `verification-type-analyzer` | 6 | Claude | Type design quality, encapsulation, invariants |
 | `verification-silent-failure` | 7 | Claude | Silent failures, error handling, fallbacks |
 | `verification-comment-analyzer` | 8 | Claude | Comment accuracy, docstring compliance |
-| Codex adversarial-review | 8.7 | GPT-5.4 | Adversarial review: auth, data safety, races, rollback |
+| Codex adversarial-review | 8.7 | Codex CLI (your configured model) | Adversarial review: auth, data safety, races, rollback |
 | `verification-test-coverage` | 12 | Claude | Test coverage quality, gap analysis |
 
 ### Phases 6-8 + 8.7: Parallel Agent + Codex Execution
 
-Launch all three Claude agents AND Codex adversarial review concurrently.
+Launch the Claude agents (two, or three when the Phase 6 gate passed) AND the
+Codex adversarial review concurrently.
 
 **Claude agents** — single Task tool call with multiple invocations:
 
 ```
-Task(subagent_type: "verification-type-analyzer", model: "opus", prompt: "...")
+Task(subagent_type: "verification-type-analyzer", model: "opus", prompt: "...")   # only when the Phase 6 gate passed
 Task(subagent_type: "verification-silent-failure", model: "opus", prompt: "...")
 Task(subagent_type: "verification-comment-analyzer", model: "opus", prompt: "...")
 ```
 
-**Codex adversarial review** — launch via Bash in the SAME message as the Task
-calls above (this makes it truly parallel):
+**Codex adversarial review** — in the SAME message as the Task calls above,
+one Bash call with `run_in_background: true` that runs, in order, the
+`codex-companion` block, the `codex-scope` block and the launch loop from
+Phase 8.7. Keep every job id it prints.
 
-```bash
-Bash(command: 'node "/Users/arkevo/.claude/plugins/cache/openai-codex/codex/1.0.2/scripts/codex-companion.mjs" adversarial-review --background', run_in_background: true)
-```
-
-**CRITICAL:** Use a single message with multiple tool calls (3x Task + 1x Bash)
+**CRITICAL:** Use a single message with multiple tool calls (2-3x Task + 1x Bash)
 to ensure parallel execution. Do NOT call them sequentially.
 
 ### Codex Availability Handling
 
 Codex is a **best-effort enhancement**, not a gate. If Codex is unavailable
-(not authenticated, CLI missing, network error), the verification continues
-without it:
+(plugin not installed, not authenticated, CLI missing, network error), the
+verification continues without it:
 
 | Codex Status | Action |
 |--------------|--------|
 | Completed with findings | Merge findings into Phase 9 |
 | Completed with `approve` | Note "Codex: no issues" in report |
 | Still running at Phase 9 | Wait up to 60s, then proceed without |
-| Failed or unavailable | Note "Codex review: unavailable" in report |
+| Companion not found | Note "Codex review: unavailable — plugin not installed" |
+| Failed with a config or effort rejection | Run `codex --version`, fix what it shows, relaunch once; report the effort used |
+| Failed with a usage-limit message | Note "Codex review: unavailable (usage limit, resets <time from the message>)"; do not retry before then |
+| Reply was not JSON (`parseError` set) | Treat as failed: note "Codex review: unavailable — reply was not JSON" |
+| Failed or unavailable for any other reason | Run `codex --version` first (Phase 8.7); note "Codex review: unavailable — <reason>" |
 
 ### Agent Input Format
 
@@ -1210,13 +1334,16 @@ After all parallel agents complete, the main context applies edits and collects
 Codex results:
 
 1. **Collect** all `proposed_edits` from Claude agent responses
-2. **Collect Codex results** — run:
+2. **Collect Codex results** by job id, one call per pass, with the
+   `codex-companion` block from Phase 8.7 run first in the same Bash call:
    ```bash
-   node "/Users/arkevo/.claude/plugins/cache/openai-codex/codex/1.0.2/scripts/codex-companion.mjs" result --json
+   node "$COMPANION" result <jobId> --json
    ```
-   - If Codex completed: parse `verdict` and `findings`, merge into unified list
-   - If Codex still running: proceed with edits, check again before Phase 9
-   - If Codex failed/unavailable: note in report, continue without it
+   - If a pass completed: check its scope (`target.label`), then parse
+     `verdict` and `findings` and merge them into the unified list
+   - If a pass is still running: proceed with edits, collect again before Phase 9
+   - If a pass failed or Codex was unavailable: note it in the report and
+     continue without it
 3. **Group by file** to detect potential conflicts (multiple edits to same file)
 4. **Detect conflicts** - if two agents propose edits to overlapping code:
    - Present both edits to user
@@ -1278,35 +1405,35 @@ Verification Triggered
 +-------------------------------------+
 | Phase 1: Gather Context             |
 | - Read .beads/.session-state.json   |
-| - Get modified_files list           |
+| - Get modified_files (changed set)  |
 +-------------------------------------+
         |
         v
 +-------------------------------------+
-| Phases 2-5: Sequential Analysis     |
-| - Lint fixes (main context)         |
-| - Code review (main context)        |
-| - Architecture (main context)       |
-| - Simplification (main context)     |
+| Phases 2-3: Sequential Analysis     |
+| - Lint fixes (changed set only)     |
+| - Rules + intent review (main ctx)  |
+| - Phase 6 gate: new types? (grep)   |
 +-------------------------------------+
         |
         v
 +---------------------------------------------+
-| Phases 6-8 + 8.7: PARALLEL AGENTS + CODEX  |
+| Phases 6-8 + 8.7: PARALLEL AGENTS + CODEX   |
 |                                             |
 |  +-------------+ +-------------+            |
 |  |verification-| |verification-|            |
 |  |type-analyzer| |silent-      |            |
-|  |  (Claude)   | |failure      |            |
+|  | (Claude,    | |failure +    |            |
+|  |  gated)     | |bug scan     |            |
 |  +-------------+ |(Claude)     |            |
 |         +-------------+  +-------------+    |
 |         |verification-|  |   CODEX     |    |
 |         |comment-     |  | adversarial |    |
 |         |analyzer     |  |  review     |    |
-|         |(Claude)     |  |  (GPT-5.4)  |    |
+|         |(Claude)     |  |(2nd model)  |    |
 |         +-------------+  +-------------+    |
 |                                             |
-|  Claude: Single Task call, 3 invocations    |
+|  Claude: Single Task call, 2-3 invocations  |
 |  Codex:  Bash --background (concurrent)     |
 |  Returns: findings + proposed_edits         |
 +---------------------------------------------+
@@ -1316,7 +1443,7 @@ Verification Triggered
 | Phase 8.5: APPLY AGENT EDITS        |
 | - Collect proposed_edits from all   |
 | - Group by file, detect conflicts   |
-| - Apply non-conflicting edits       |
+| - Apply edits inside changed set    |
 | - Prompt user for conflicts         |
 | - Scoped ruff format + leak check   |
 +-------------------------------------+
@@ -1336,12 +1463,14 @@ Verification Triggered
 | - ruff check (verify edits OK)      |
 | - ruff format --check               |
 | - pytest -v                         |
+| - test presence (from Phase 3)      |
 +-------------------------------------+
         |
         v
 +-------------------------------------+
 | Phase 11.5: Build Validation        |
-| - Invoke /P11.5-build-validation    |
+| - Invoke /workflow-commands:        |
+|   P11.5-build-validation-[F]        |
 | - Python env + package build check  |
 | - PASS / WARN / FAIL result         |
 +-------------------------------------+
@@ -1357,7 +1486,7 @@ Verification Triggered
 +-------------------------------------+
 | Phase 12.5: RUN NEW TESTS           |
 | - Apply Phase 12 proposed_edits     |
-| - ruff check on new test files      |
+| - Scoped ruff format, ruff check    |
 | - pytest -v (all old + new)         |
 | - Fix up to 3x, then revert         |
 | (Skip if no edits were applied)     |
@@ -1365,13 +1494,13 @@ Verification Triggered
         |
         v
 +-------------------------------------+
-| Phase 14: Security Review           |
-| - Auto-trigger for sensitive files  |
+| Phase 14: Security Review (gated)   |
+| - Only when sensitive files changed |
 | - Hardcoded secrets scan            |
 | - HTTPS/auth/storage checks         |
 | - Python-specific security checks:  |
 |   dynamic code, deserialization,    |
-|   shell injection, SQL injection    |
+|   shell, SQL, database grants       |
 +-------------------------------------+
         |
         v
@@ -1407,8 +1536,6 @@ The Phase 13 report now includes auto-fixed issues:
 
 ```markdown
 ## Verification Report
-
-### Architecture Score: X/10
 
 ### Summary
 Found [N] issues. Auto-fixed [M] issues. [K] issues require attention.
@@ -1455,6 +1582,7 @@ These issues require manual attention:
 
 If agent execution fails:
 1. Log the failure
-2. Fall back to sequential in-context analysis for that phase
+2. Fall back to sequential in-context analysis for that phase (for Phase 7,
+   that includes its Step 4 bug scan)
 3. Continue with remaining phases
 4. Note the fallback in the verification report
