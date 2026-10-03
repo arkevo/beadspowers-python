@@ -237,6 +237,11 @@ Estimated cost: ~X–Y% of the 5-hr usage limit
 
 Artifacts: docs/plans/<epic-slug>/
 
+Branches:  Step 6 may split a long plan across two worktree agents. This
+           fan-out creates temporary worktree branches, which are merged back
+           and removed as each agent finishes; approving this gate is the branch
+           approval that `critical ai agent rule.md` requires.
+
 Proceed? (yes / adjust scope / cancel)
 ```
 
@@ -402,20 +407,30 @@ shrinks the conflict surface when a shared section can't be avoided.
 Run one agent per bucket, **each in its own `opts.isolation: 'worktree'`**,
 applying only that bucket's decisions (batched per the rule above).
 
-**Worktree base-drift guard (mandatory).** `isolation: 'worktree'` may hand
-an agent a *reused* worktree whose branch was never fast-forwarded to the
-epic branch's current tip — observed in practice as several bucket agents
-silently landing on a commit multiple commits behind the one Step 3/4
-actually committed (in one run, a commit that predated the epic's own
-planning-sequence commit). Guard against this explicitly rather than relying
-on an agent to notice: capture the epic branch's current HEAD SHA in main
-context right before launching this workflow, pass it via `args`, and make
-every bucket agent's first action `git merge <that-sha>` into its worktree —
-a real merge, never a hand reconstruction of file content via `git show`.
-(A hand-reconstructed file matches content but has no true git ancestry to
-the epic branch, which then conflicts on merge-back even when both sides
-agree — see below.) If the plan file is already present and the worktree is
-already caught up, the merge is a no-op.
+**Worktree base-drift guard (mandatory).** `isolation: 'worktree'` does not
+start an agent on the epic branch: the worktree may start from the trunk, or be
+a *reused* worktree whose branch was never moved to the epic branch's current
+tip. In practice, bucket agents have silently landed on a commit several commits
+behind the one Step 3/4 actually committed (in one run, a commit that predated
+the epic's own planning-sequence commit). Guard against this explicitly rather
+than relying on an agent to notice: capture the epic branch's current HEAD SHA
+in main context right before launching this workflow, pass it via `args`
+together with a bucket branch name, and make every bucket agent's **first
+command**
+
+```bash
+git switch -c <bucket-branch> <epic-head-sha>
+```
+
+so it works on a fresh branch that starts exactly at the epic branch's tip.
+Never `git merge <epic-head-sha>` into the worktree's own branch instead: when
+that branch started from the trunk, the merge drags trunk commits the epic
+branch does not have into the bucket branch, and from there into the epic branch
+at merge-back. Never hand-reconstruct the plan file from `git show` either: a
+reconstructed file matches content but has no git ancestry to the epic branch,
+which then conflicts on merge-back even when both sides agree (see below). Name
+the bucket branches `chore/wp-apply-<task-id>-<n>`; they are temporary, and the
+Step 2 gate's approval covers creating them.
 
 Have each agent commit its own change to the plan file on its own worktree
 branch before returning — report that branch name in its structured result
@@ -424,7 +439,7 @@ so a main-context step can find it:
 ```js
 const buckets = splitDecisionsByDisjointSection(decisions); // e.g. 2 buckets
 const results = await parallel(buckets.map((bucket, i) => () =>
-  agent(applyBucketPrompt(planFile, bucket, epicHeadSha), {
+  agent(applyBucketPrompt(planFile, bucket, epicHeadSha, `chore/wp-apply-${task.id}-${i}`), {
     label: `apply-${task.id}-bucket${i}`, phase: 'Apply',
     model: 'sonnet', effort: 'medium',
     isolation: 'worktree', schema: APPLY_BUCKET_SCHEMA, // includes branch_name
@@ -591,12 +606,12 @@ require babysitting the console. Do not notify for purely automated transitions.
   main context. Never default Step 6 to Opus/xhigh — that pairing has
   already produced a 190k-token, 15-minute apply run for what should be a
   mechanical copy-edit pass.
-- **Step 6 worktree base-drift guard**: a reused worktree is not guaranteed to
-  be at the epic branch's current tip. Every split-apply agent must sync to
-  the epic branch's HEAD SHA (passed via `args`) before editing, via a real
-  `git merge` — never a hand-reconstructed file. In main context, verify each
-  bucket branch's ancestry before merging; if it isn't an ancestor, use a
-  content-level `git merge-file` against the pre-Step-6 original instead of
-  `git merge` (which would report a spurious conflict even on agreeing
-  content). See Step 6 for the full procedure — this has already happened in
-  practice, not a hypothetical.
+- **Step 6 worktree base-drift guard**: an isolated worktree is not guaranteed
+  to start at the epic branch's current tip. Every split-apply agent's first
+  command is `git switch -c <bucket-branch> <epic-head-sha>` (the SHA passed via
+  `args`) — never `git merge <sha>`, which can drag trunk commits in, and never a
+  hand-reconstructed file. In main context, verify each bucket branch's ancestry
+  before merging; if it isn't an ancestor, use a content-level `git merge-file`
+  against the pre-Step-6 original instead of `git merge` (which would report a
+  spurious conflict even on agreeing content). See Step 6 for the full procedure
+  — this has already happened in practice, not a hypothetical.

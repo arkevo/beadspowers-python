@@ -13,7 +13,7 @@ Beads stays the source of truth.
 ## Step 0: Verification Gate (HARD STOP)
 
 **Refuse to ship until verification has run this session** — see the router's
-*Hard Stop: Verification Before Ship / "Done"*. Check for the marker a
+*Verification Before Ship / "Done"*. Check for the marker a
 `python-verification-{level}` skill writes on pass:
 
 ```bash

@@ -7,7 +7,7 @@ description: Post-execution options after plan execution completes - verificatio
 After **any** implementation path completes — `execute-plans` /
 `subagent-driven-development`, the **bug path** (`systematic-debugging → TDD`), or
 any **direct TDD** fix — determine verification level and offer options. This is
-mandatory before ship/"done" (see the router's *Hard Stop: Verification Before
+mandatory before ship/"done" (see the router's *Verification Before
 Ship / "Done"*); it is NOT limited to plan-execution. The chosen
 `python-verification-{level}` skill writes the `.beads/.verification-done` marker
 that `workflow-commands:beads-ship-task` gates on.

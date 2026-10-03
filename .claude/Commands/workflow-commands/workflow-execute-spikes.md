@@ -159,6 +159,10 @@ Agents: ≈A (one per auto-observe spike, throwaway worktree; cap min(16, cores�
 Est. cost: ~X–Y% of the 5-hr limit
 Deliverable: docs/plans/<epic-slug>/<spike-id>-findings.md (+ evidence) per spike; code discarded
 
+This fan-out creates temporary worktree branches, which are removed as each
+agent finishes (spike code is never merged back); approving this gate is the
+branch approval that `critical ai agent rule.md` requires.
+
 Proceed? (yes / adjust scope / cancel)
 ```
 

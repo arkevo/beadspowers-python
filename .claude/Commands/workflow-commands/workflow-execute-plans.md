@@ -281,6 +281,10 @@ Estimated cost: ~X–Y% of the 5-hr usage limit
 Autonomous tasks run to completion in parallel; smoke + attended work is
 collected and presented as one batched session (walk-away batching).
 
+This fan-out creates temporary worktree branches, which are merged back and
+removed as each agent finishes; approving this gate is the branch approval
+that `critical ai agent rule.md` requires.
+
 Proceed? (yes / adjust scope / cancel)
 ```
 
@@ -359,7 +363,7 @@ an `ex:qa:<level>` label and a QA-ledger line (a bare `ex:qa` means
 "verification did not run").
 
 > **Lane symmetry (both are HARD gates).** This per-task `ex:qa:<level>` label is
-> the fan-out lane's embodiment of the router's *Hard Stop: Verification Before
+> the fan-out lane's embodiment of the router's *Verification Before
 > Ship / "Done"*. The single-task lane's analog is the `.beads/.verification-done`
 > marker written by the `python-verification-{level}` skill and checked by
 > `workflow-commands:beads-ship-task` Step 0. Same rule, two mechanisms: **no path ships without a
@@ -513,7 +517,8 @@ give the user a plain-language status report, not just the QA ledger. Pull
 every task's `ex:*` / `wp:*` label via `beads:show` / `beads:list` and say:
 
 - **Fully executed** — if every task in the resolved scope (Step 0a) is
-  `ex:done`, say so and name the next command: `/workflow-commands:workflow-ship-epic <epic-id>`.
+  `ex:done` and the ship-recommendation gate below finds nothing left, say so
+  and name the next command: `/workflow-commands:workflow-ship-epic <epic-id>`.
 - **Blocked bugs** — name every `ex:blocked` task and its filed bug id; these
   need a fix pass before shipping is possible.
 - **Refused at Step 0b** — if the run refused to start because a non-deferred
@@ -531,6 +536,49 @@ every task's `ex:*` / `wp:*` label via `beads:show` / `beads:list` and say:
 State the single next command plainly — `/workflow-commands:workflow-ship-epic <epic-id>` when
 fully done, the fix/plan command otherwise — rather than a menu of every
 possibility.
+
+### Ship-recommendation gate (HARD RULE)
+
+Never recommend, suggest, or ask about `/workflow-commands:workflow-ship-epic`
+while any task in the epic is left — not as the next step, not as an option, not
+as "want me to start the ship?". Name the ship only when all of these hold, read
+with `beads:list` / `beads:show` in this turn, never from memory or an earlier
+table:
+
+- every open child task is `ex:done`, and no `ex:smoke-pending` or `ex:blocked`
+  is still in force. A label is *still in force* when nothing later has
+  discharged it: `ex:smoke-pending` stays in force until the task reaches
+  `ex:done` (or carries `smoke:passed`), and `ex:blocked` stays in force while
+  the bug it filed is open or the task has not reached `ex:done` since. Labels
+  are append-only, so an old `ex:blocked` next to a later `ex:done` is history,
+  not a blocker;
+- no `Smoke gate:` bead under the epic is open;
+- no child is `wp:deferred`, unplanned (no `wp:*` label), or not started (no
+  `ex:*` label);
+- no attended or ops child is open — a migration apply, a cloud-console step, a
+  release gate.
+
+When anything is left, name the step that finishes it instead:
+
+- **A smoke that needs the epic's code running somewhere** — for example a
+  server change whose smoke runs against a staging environment: the next step is
+  a deploy of the epic branch to that environment, then the smoke. A deploy is a
+  managed-cloud change, so ask the owner first
+  (`.claude/rules/critical ai agent rule.md`). Never "ship so that it deploys":
+  shipping opens the integration PR and closes tasks; it deploys nothing.
+- **A `wp:deferred` or unplanned task:** `/workflow-commands:workflow-writing-plans <epic-id>`
+  once its upstream has executed, or ask the owner whether to move it out of the
+  epic. Waiting on something outside the epic means the epic is not done yet —
+  say so, and do not work around it by shipping.
+- **An `ex:blocked` task:** the fix pass for the bug it filed (Step 7).
+- **An open attended or ops step:** name the owner action it needs.
+
+Why: in a downstream project, a completion report once recommended shipping
+while three smoke gates, a deferred release gate and a migration gate were still
+open, reasoning that the ship would put the code on staging so the smokes could
+run. The owner rejected it: an epic ships when its work is finished.
+`/workflow-commands:workflow-ship-epic` refuses a partial epic at its Step 1
+anyway; this gate stops the recommendation before that refusal is ever needed.
 
 ---
 
@@ -664,6 +712,23 @@ Do not notify for purely automated transitions (autonomous execute/QA/auto-merge
 - **Beads router** (`.claude/rules/0_Beads x Superpowers/beads-workflow-router.md`):
   scope all task listing to the chosen epic; use the `ex:*` stage labels.
 - **Beads via skills:** use `beads:*` skills, never raw `bd` in Bash.
+- **This command never changes bead status.** Never call `beads:update --status`
+  here — not to claim a task, not to finish one. The `ex:*` labels are this lane's
+  only progress record, and `/workflow-commands:workflow-ship-epic` makes the
+  single status transition (open → closed) at the end. "Mark `in_progress` when
+  starting" is a single-task-lane rule; carried into a batch run it adds a second
+  status writer that nothing ever clears, so tasks strand in `in_progress` and the
+  epic reads as a mix of whichever writes happened to land (observed in a
+  downstream project). "Reopen the task" in Step 6 means another fix pass on the
+  code, not a status change. See the router's *Workflow Rules* section.
+- **Read back every label write, and keep bead writes serial.** After each
+  `beads:label` / `beads:update`, confirm the change with `beads:show`. If it is
+  missing, retry once — serially, never alongside another beads command — and if
+  it is still missing, stop and surface it. Never run two beads commands at the
+  same time: two `bd` processes writing the shared store can revert each other's
+  rows. When a fan-out returns, re-read every task's labels before trusting them:
+  a lost `ex:*` label silently un-does a finished task, and a resumed run would
+  redo it. See `.claude/rules/0_Beads x Superpowers/beads.md`.
 - **Budget gate first:** never start the Step 3 workflow before the Step 2
   confirmation.
 - **Smoke launch:** start the project with `<run-command>`; smoke verifies the

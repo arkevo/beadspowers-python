@@ -1523,8 +1523,7 @@ Verification Triggered
 ## Write Verification Marker (ONLY on PASS)
 
 Immediately before generating the Phase 13 report — and ONLY if Phase 11's tests
-passed (and no blocking finding remains) — write the marker the router's *Hard
-Stop: Verification Before Ship / "Done"* and `workflow-commands:beads-ship-task` gate on:
+passed (and no blocking finding remains) — write the marker the router's *Verification Before Ship / "Done"* and `workflow-commands:beads-ship-task` gate on:
 
 ```bash
 TASK=$(python3 -c "import json;print(json.load(open('.beads/.session-state.json')).get('task_id',''))" 2>/dev/null)

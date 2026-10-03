@@ -32,7 +32,7 @@ marker can record which task it covers):
 ```
 
 Also clear any stale verification marker from a previous task so it cannot pass
-the ship gate (router *Hard Stop: Verification Before Ship / "Done"*):
+the ship gate (router *Verification Before Ship / "Done"*):
 ```bash
 rm -f .beads/.verification-done
 ```

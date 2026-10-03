@@ -100,7 +100,7 @@ pytest -v
 
 ## Phase 12: Write Verification Marker (ONLY on PASS)
 
-The router's *Hard Stop: Verification Before Ship / "Done"* and `workflow-commands:beads-ship-task`
+The router's *Verification Before Ship / "Done"* and `workflow-commands:beads-ship-task`
 gate on this marker. Write it ONLY after tests pass — never on failure:
 
 ```bash
