@@ -124,6 +124,9 @@ fi
 A project with no Dolt remote yet prints that one line and carries on. If the push
 is rejected as diverged, run `bd dolt pull` and retry — never `--force` (only for a
 deliberate, agreed re-baseline).
+On a brand-new, empty remote the pull itself fails with "no branches found in remote":
+seed it once with `bd dolt push` (which also publishes this ship's beads), and
+the pull-then-push works from then on.
 
 ## Step 7: Show Unblocked Tasks
 Show what's now unblocked. If an epic is active, scope to that epic's tasks.

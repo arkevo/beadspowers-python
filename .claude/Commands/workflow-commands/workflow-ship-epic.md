@@ -238,7 +238,10 @@ fi
 
 With no Dolt remote yet, this prints that one line and carries on: the beads stay
 in the local store, versioned by Dolt. (`bd dolt push` alone would skip quietly
-without a remote, but `bd dolt pull` fails outright, hence the check.) Add a remote
+without a remote, but `bd dolt pull` fails outright, hence the check.)
+On a brand-new, empty remote the pull itself fails with "no branches found in remote":
+seed it once with `bd dolt push` (which also publishes this ship's beads), and
+the pull-then-push works from then on. Add a remote
 later with `bd dolt remote add origin git+https://github.com/<owner>/<repo>.git`.
 If the push is rejected as diverged, `bd dolt pull` and retry; never `--force`
 except a deliberate, agreed re-baseline.

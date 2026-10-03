@@ -24,6 +24,11 @@ commands — the plugin has no MCP layer (`beads-plugin-cli-only.md`).
   fi
   ```
 
+- A brand-new Dolt remote is empty, and `bd dolt pull` fails on it
+  ("no branches found in remote"). Seed it once with `bd dolt push`
+  right after `bd dolt remote add` — the README setup does — and
+  pull first, push last works from then on.
+
 ## The JSONL export is a readable artifact, nothing else
 
 - `.beads/issues.jsonl` is for reading — diffs, grep, progress reports. It is not a
