@@ -182,10 +182,12 @@ except Exception:
 for p in d.get("modified_files") or []:
     print(p["path"] if isinstance(p, dict) else p)
 ' 2>/dev/null)"
-trunk=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null) || {
-  git remote set-head origin --auto >/dev/null 2>&1
+trunk=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)
+if [ -z "$trunk" ] || ! git rev-parse -q --verify "$trunk^{commit}" >/dev/null 2>&1; then
+  git remote set-head origin --auto >/dev/null 2>&1   # unset, or dangling after the remote renamed its default branch
   trunk=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)
-}
+  git rev-parse -q --verify "$trunk^{commit}" >/dev/null 2>&1 || trunk=""
+fi
 if [ -z "$changed" ]; then
   echo "PHASE6_GATE=launch (changed set unknown)"
 elif [ -z "$trunk" ]; then
@@ -430,10 +432,12 @@ which prints one line of scope arguments per review pass:
 # snippet: codex-scope
 codex_scopes() {
   local trunk dirty ahead=0
-  trunk=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null) || {
-    git remote set-head origin --auto >/dev/null 2>&1
+  trunk=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)
+  if [ -z "$trunk" ] || ! git rev-parse -q --verify "$trunk^{commit}" >/dev/null 2>&1; then
+    git remote set-head origin --auto >/dev/null 2>&1   # unset, or dangling after the remote renamed its default branch
     trunk=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)
-  }
+    git rev-parse -q --verify "$trunk^{commit}" >/dev/null 2>&1 || trunk=""
+  fi
   dirty=$(git status --porcelain)
   if [ -n "$trunk" ]; then
     ahead=$(git rev-list --count "$trunk..HEAD" 2>/dev/null || echo 0)
@@ -753,7 +757,7 @@ Check every file in the Phase 1 changed set against these patterns.
 - Environment files: `.env`, `.env.*`
 
 **Content patterns** (anywhere in a changed file):
-- Secrets: `api_key`, `apiKey`, `secret`, `token`, `password`, `credential`
+- Secrets: `api_key`, `apiKey`, `secret`, `token`, `password`, `credential` (any case)
 - Network: `http`, `requests`, `httpx`
 - Risky calls: `eval(`, `exec(`, `pickle`, `yaml.load`, `subprocess`,
   `shell=True`, `verify=False`, `DEBUG`, `random.`
@@ -767,7 +771,8 @@ python3 -c 'import json; [print(p) for p in json.load(open(".beads/.session-stat
 while IFS= read -r f; do
   if printf '%s\n' "$f" | grep -qE '(^|/)src/(.*/)?(auth|api|service[^/]*|repository|network|http)/|(^|/)migrations/|(^|/)alembic/versions/|\.sql$|(^|/)settings(\.py$|/)|(^|/)\.env(\..+)?$'; then
     echo "$f"
-  elif [ -f "$f" ] && grep -qE 'api_key|apiKey|secret|token|password|credential|http|requests|httpx|eval\(|exec\(|pickle|yaml\.load|subprocess|shell=True|verify=False|DEBUG|random\.|GRANT|REVOKE|CREATE POLICY|ROW LEVEL SECURITY|SECURITY DEFINER' -- "$f"; then
+  elif [ -f "$f" ] && { grep -qiE 'api_?key|secret|token|password|credential' -- "$f" ||
+      grep -qE 'http|requests|httpx|eval\(|exec\(|pickle|yaml\.load|subprocess|shell=True|verify=False|DEBUG|random\.|GRANT|REVOKE|CREATE POLICY|ROW LEVEL SECURITY|SECURITY DEFINER' -- "$f"; }; then
     echo "$f"
   fi
 done

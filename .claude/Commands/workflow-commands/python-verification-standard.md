@@ -231,7 +231,7 @@ as a match.
 - environment files (`.env`, `.env.*`)
 
 **Content patterns (the changed file contains):**
-- `apiKey`, `api_key`, `secret`, `token`, `password`, `credential`
+- `apiKey`, `api_key`, `secret`, `token`, `password`, `credential` (any case)
 - `requests`, `httpx`, `http`
 - `eval(`, `exec(`, `pickle`, `yaml.load`, `subprocess`, `shell=True`,
   `verify=False`, `DEBUG`, `random.`

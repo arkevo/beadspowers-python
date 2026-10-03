@@ -36,10 +36,10 @@ Workflow state under `.beads/` is not task work, so it is left out too, and a
 renamed file is recorded under its new path. `total_lines_changed` covers the same
 range (lines added plus lines removed) plus the full length of every untracked
 file. The trunk is whatever `origin/HEAD` points at, normally `origin/main` or
-`origin/master`; when that is unset, the block asks git to set it once. When the
-repository has no `origin` at all, the branch's own commits cannot be measured,
-so the block records the uncommitted and untracked files and says the branch
-range was skipped.
+`origin/master`; when that is unset or dangling, the block asks git to set it
+once. When the repository has no `origin` at all, the branch's own commits
+cannot be measured, so the block records the uncommitted and untracked files and
+says the branch range was skipped.
 
 Run the block from anywhere inside the repository. It rewrites only
 `modified_files` (a plain list of path strings) and `total_lines_changed`, and
@@ -48,10 +48,12 @@ keeps every other key in the file (`task_id`, `plan_file`, `verification`, …):
 ```bash
 # snippet: changed-set
 cd "$(git rev-parse --show-toplevel)" || exit 1
-trunk=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null) || {
-  git remote set-head origin --auto >/dev/null 2>&1
+trunk=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)
+if [ -z "$trunk" ] || ! git rev-parse -q --verify "$trunk^{commit}" >/dev/null 2>&1; then
+  git remote set-head origin --auto >/dev/null 2>&1   # unset, or dangling after the remote renamed its default branch
   trunk=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)
-}
+  git rev-parse -q --verify "$trunk^{commit}" >/dev/null 2>&1 || trunk=""
+fi
 base=""
 [ -n "$trunk" ] && base=$(git merge-base "$trunk" HEAD 2>/dev/null)
 if [ -z "$base" ]; then
