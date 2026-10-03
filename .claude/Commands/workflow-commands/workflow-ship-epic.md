@@ -381,8 +381,8 @@ An epic at `sh:pushed` without `sh:shipped` is closed but **not shipped**. Use
 - **Shipped means merged:** the first run ends at `sh:pushed` (PR opened, tasks and
   epic closed); only a re-run that confirms the merge (Step 0) adds `sh:shipped`.
   Never add `sh:shipped` on the strength of a pushed branch or an open PR.
-- **Precondition (Step 1):** never ship a partially-executed epic — every task
-  (closure-wide) must be `ex:done`.
+- **Precondition (Step 1):** never ship a partially-executed epic — every open
+  task (closure-wide) must be `ex:done`.
 - **Cross-epic closure (Step 2):** never guess the integration strategy when the
   closure spans epics — ask.
 - **Git workflow (`no-direct-push-to-master.md`):** never commit or push to the trunk

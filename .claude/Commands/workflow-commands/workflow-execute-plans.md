@@ -148,8 +148,9 @@ Before resolving scope, apply Rule 1 of
 labels, and its children's, with `beads:list` / `beads:show` in this turn, and
 look for another epic in either state:
 
-- **Finished, never shipped:** every open child is `ex:done`, but the epic has no
-  `sh:*` label. Its tasks are still open and its code is not on the trunk.
+- **Finished, never shipped:** an **open** epic whose open children are all
+  `ex:done`, but which has no `sh:*` label. Its tasks are still open and its
+  code is not on the trunk.
 - **PR opened, not merged:** the epic carries `sh:pushed` but not `sh:shipped`.
   `/workflow-commands:workflow-ship-epic` opened its PR and closed its tasks, but
   nobody has confirmed the merge.

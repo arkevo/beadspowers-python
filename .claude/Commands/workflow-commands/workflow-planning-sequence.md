@@ -139,10 +139,10 @@ Each step is tagged **[workflow]** (detached, non-interactive) or **[main ctx]**
 Before loading anything, run the check in
 `.claude/rules/0_Beads x Superpowers/surface-unshipped-epics.md` (Rules 1 and 2):
 
-- **Finished but never shipped:** an epic whose open children all carry
+- **Finished but never shipped:** an **open** epic whose open children all carry
   `ex:done` while the epic itself has neither `sh:pushed` nor `sh:shipped`. Find
   candidates with `beads:list --type=epic --all`, then read each one's children
-  with `beads:list --parent <epic-id> --all`.
+  with `beads:list --parent <epic-id>`.
 - **PR opened, not merged:** a closed epic carrying `sh:pushed` but not
   `sh:shipped` — its integration PR was opened on the epic's close date and the
   merge has not been confirmed yet.
