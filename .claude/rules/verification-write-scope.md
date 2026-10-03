@@ -9,12 +9,21 @@ whole project. Anything that **writes** — `ruff check --fix`, `ruff format`, a
 edit a review agent proposes — touches only the task's **changed set**: the paths
 in `modified_files` in `.beads/.session-state.json`, which
 `workflow-commands:beads-post-execution` Step 2a records.
+Analysis calls are always `ruff check --no-fix …`: a project may set `fix = true`
+in `[tool.ruff]`, and a bare `ruff check` then rewrites files.
 
 - **Changed set unknown → no auto-fix.** When the session state is missing or
   unreadable, or `modified_files` is empty, skip every automatic fix and say so in
   the report: `Auto-fixed: SKIPPED (changed set unknown)`. Never widen to the
   project root, and never ask the user for a file list just to justify a fix. A
-  list the user volunteers is a valid changed set; echo it back in the report.
+  list the user volunteers is a valid changed set; echo it back in the report. So
+  is a path a command takes as its argument (P02's, for example). Before any write
+  block runs, write such a list into `modified_files` — read the file, change that
+  one key, write it back, as `workflow-commands:beads-post-execution` Step 2b does
+  — with a named directory standing for the files under it
+  (`git ls-files --cached --others --exclude-standard -- <dir>`). An answer to
+  "which files should I look at?" only steers reading; it never becomes the
+  changed set.
 - **Never auto-fixed, even inside the changed set:** anything under `.venv/`,
   `vendor/` or `third_party/`; generated code (for example `*_pb2.py`); and
   `migrations/`, which is a protected path in this workflow. Notebooks (`.ipynb`)

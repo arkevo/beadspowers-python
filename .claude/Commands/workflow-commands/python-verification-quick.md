@@ -30,6 +30,8 @@ For small changes (< 50 lines), run only essential checks: lint + tests.
    auto-fix, and do not fall back to the project root: Phase 2 Step 2 skips
    instead (`.claude/rules/verification-write-scope.md`). A list the user
    volunteers unprompted is a valid changed set; echo it back in the report.
+   Write it into `modified_files` first, as `.claude/rules/verification-write-scope.md`
+   describes, so the write blocks see it.
 
 ---
 
@@ -41,7 +43,7 @@ Run ruff and mypy on the changed files. Analysis only reads, so when the changed
 set is UNKNOWN, run the same two commands on `src/ tests/` instead:
 
 ```bash
-ruff check <changed_files>
+ruff check --no-fix <changed_files>
 mypy <changed_files>
 ```
 
@@ -152,7 +154,7 @@ Invoke this skill when:
 
 | What | How |
 |------|-----|
-| Lint analysis | `ruff check <files>` via Bash |
+| Lint analysis | `ruff check --no-fix <files>` via Bash |
 | Type checking | `mypy <files>` via Bash |
 | Auto-fix | the `scoped-ruff-fix` block from `.claude/Commands/workflow-commands/references/scoped-ruff.md` — changed set only, never unscoped |
 | Run tests | `pytest <files> -v` via Bash |

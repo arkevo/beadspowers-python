@@ -32,7 +32,9 @@ Before reviewing any code:
   changed set is **UNKNOWN**. You may ask the user for a file list to guide the
   review phases, but Phase 2's auto-fix is skipped in this state — never widened
   to the project root (`.claude/rules/verification-write-scope.md`). A list the
-  user volunteers is a valid changed set; echo it back in the report.
+  user volunteers is a valid changed set; echo it back in the report. Write it
+  into `modified_files` first, as `.claude/rules/verification-write-scope.md`
+  describes, so the write blocks see it.
 - Note which directories/layers were affected
 - **Scope all subsequent phases to ONLY these files**: the review phases report
   only on them, and nothing outside them is ever written
@@ -60,7 +62,7 @@ Run ruff and mypy on the changed files. Analysis only reads, so when the changed
 set is UNKNOWN, run the same two commands on `src/ tests/` instead:
 
 ```bash
-ruff check <changed_files>
+ruff check --no-fix <changed_files>
 mypy <changed_files>
 ```
 
@@ -97,7 +99,7 @@ file outside the changed set is reported, not fixed):
 
 ### Step 5: Verify Fixes
 
-Run `ruff check` again to confirm resolution.
+Run `ruff check --no-fix` again to confirm resolution.
 
 ---
 
@@ -262,7 +264,7 @@ Exclude from final report:
 
 Run final verification sequence:
 
-1. `ruff check <changed_files>` via Bash - Confirm no lint errors
+1. `ruff check --no-fix <changed_files>` via Bash - Confirm no lint errors
 2. `ruff format --check <changed_files>` via Bash - Ensure consistent formatting
 3. `pytest -v` via Bash - Execute all tests
 

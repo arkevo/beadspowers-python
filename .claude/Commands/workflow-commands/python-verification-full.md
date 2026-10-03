@@ -41,7 +41,9 @@ Before reviewing any code:
   written: Phase 2 Step 3, Phase 8.5 step 6 and Phase 12.5 step 1 skip their
   writes in this state and say so in the report, and nothing ever widens to
   the project root. A file list the user volunteers without being asked is a
-  valid changed set: echo it back, then use it.
+  valid changed set: echo it back, then use it. Write it into `modified_files`
+  first, as `.claude/rules/verification-write-scope.md`
+  describes, so the write blocks see it.
 - Note which directories/layers were affected
 - **Scope all subsequent phases to ONLY these files**, for reading and writing
   alike (see Scope Control)
@@ -62,7 +64,7 @@ Before reviewing any code:
 **Run this early to clean up code before deeper analysis.**
 
 ### Step 1: Run Static Analysis
-Run `ruff check <changed_files>` and `mypy <changed_files>` via Bash on the
+Run `ruff check --no-fix <changed_files>` and `mypy <changed_files>` via Bash on the
 changed files only (not entire codebase).
 
 ### Step 2: Categorize Issues
@@ -107,7 +109,7 @@ Address remaining errors and warnings:
 4. Skip info-level hints unless specifically requested
 
 ### Step 5: Verify Fixes
-Run `ruff check <changed_files>` and `mypy <changed_files>` again on changed
+Run `ruff check --no-fix <changed_files>` and `mypy <changed_files>` again on changed
 files to confirm issues resolved.
 
 **Important:** Do not introduce new warnings while fixing existing ones.
@@ -451,7 +453,7 @@ Exclude these from the final report:
 ## Phase 11: Final Verification
 
 Run final verification sequence:
-1. `ruff check <changed_files>` via Bash - Confirm no lint errors remain
+1. `ruff check --no-fix <changed_files>` via Bash - Confirm no lint errors remain
 2. `ruff format --check <changed_files>` via Bash - Ensure consistent formatting
 3. `pytest -v` via Bash - Execute all tests
 
@@ -585,7 +587,7 @@ Collect all `proposed_edits` from the Phase 12 agent response:
 
 ### Step 2: Analyze New Test Files
 
-Run `ruff check <modified_test_files>` via Bash on the test files that were
+Run `ruff check --no-fix <modified_test_files>` via Bash on the test files that were
 modified/created by Phase 12 edits. If lint errors exist:
 1. Fix compilation errors in the generated tests
 2. Re-run analysis until clean
@@ -1249,7 +1251,7 @@ This agent runs sequentially because:
 
 After Phase 12 agent returns:
 1. Apply `proposed_edits` to test files (same process as Phase 8.5)
-2. Run `ruff check` on modified test files
+2. Run `ruff check --no-fix` on modified test files
 3. Run `pytest -v` — all tests (old + new) must pass
 4. If new tests fail: fix up to 3 times, then revert and note in report
 5. Proceed to Phase 14 (Security Review), then Phase 13 (Report)

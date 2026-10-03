@@ -6,7 +6,9 @@ Please analyze and fix lint issues here: $ARGUMENTS.
 Analysis only reads, so it may look wide; what it may *write* is decided in
 Step 4. Choose the files to analyse in this order:
 
-1. the path given as the argument above, if there is one;
+1. the path given as the argument above, if there is one. It becomes the changed
+   set: write it into `modified_files` as `.claude/rules/verification-write-scope.md`
+   describes, so Step 4 fixes exactly those files;
 2. otherwise the task's changed set, `modified_files` in
    `.beads/.session-state.json`;
 3. otherwise, as a last resort, the whole project (`src/ tests/`).
@@ -17,7 +19,7 @@ unknown (`.claude/rules/verification-write-scope.md`).
 
 ```bash
 # Lint errors and warnings (read-only)
-ruff check <files to analyse>
+ruff check --no-fix <files to analyse>
 
 # Type checking (read-only)
 mypy <files to analyse>
@@ -31,7 +33,7 @@ Use `vulture` to find unused code, and `ruff` for unused imports:
 vulture src/
 
 # Find unused imports specifically
-ruff check --select F401 src/
+ruff check --no-fix --select F401 src/
 ```
 
 **Note:** Vulture may report false positives for:
@@ -87,7 +89,7 @@ outside the changed set is reported, not fixed):
 1. Mark the current issue as in-progress
 2. Read the relevant code section using the Read tool
 3. Apply the fix following the project's `[tool.ruff]` settings in `pyproject.toml`
-4. Verify the fix by re-running `ruff check <file>` on that file
+4. Verify the fix by re-running `ruff check --no-fix <file>` on that file
 5. Check off the completed item before moving to the next
 
 **For vulture unused code:**
@@ -104,7 +106,7 @@ outside the changed set is reported, not fixed):
    `.claude/Commands/workflow-commands/references/scoped-ruff.md`, unchanged. It formats only the changed set's
    Python files with `ruff format --force-exclude`, re-checks them with
    `ruff format --check`, and reports anything that changed outside the set.
-2. Run a final `ruff check --force-exclude` on the files from Step 1 to confirm
+2. Run a final `ruff check --no-fix --force-exclude` on the files from Step 1 to confirm
    the lint issues are resolved.
 3. Re-run `mypy` on the same files to confirm the type errors are resolved.
 4. Optionally re-run `vulture src/` (read-only) to confirm the unused code is gone.
@@ -120,12 +122,12 @@ outside the changed set is reported, not fixed):
 6. Skip info-level hints unless specifically requested
 
 ## Tools to Use
-- Bash: `ruff check <files>` — Python lint analysis (read-only, may run wide)
+- Bash: `ruff check --no-fix <files>` — Python lint analysis (read-only, may run wide)
 - Bash: the `scoped-ruff-fix` block from `.claude/Commands/workflow-commands/references/scoped-ruff.md` — automatic fixes, changed set only
 - Bash: the `scoped-ruff-format` block from the same file — formatting, changed set only
 - Bash: `mypy <files>` — type checking (read-only)
 - Bash: `vulture src/` — detect unused code (read-only)
-- Bash: `ruff check --select F401 src/` — detect unused imports (read-only)
+- Bash: `ruff check --no-fix --select F401 src/` — detect unused imports (read-only)
 - Grep/Glob — for targeted code search and pattern matching
 - Read/Edit — for targeted code modifications inside the changed set
 
