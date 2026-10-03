@@ -206,9 +206,12 @@ Advance the epic label to **`sh:pushed`** and echo the branch / PR URL.
 2. **Close the epic** via `beads:close` (`--reason="All child tasks completed"`).
    Skip it if it is already closed. It will not have been closed by
    `/workflow-commands:workflow-execute-plans`, which never touches bead status,
-   so this step is the only status transition in the whole batch lane. Child
-   tasks reaching here read `open` with `ex:done` — the expected steady state
-   before ship, not a missed update.
+   so this step is the only status transition in the whole batch lane. (That is
+   for the epic and its implementation tasks:
+   `/workflow-commands:workflow-execute-plans` still closes the `Smoke gate:`
+   beads it creates, and `/workflow-commands:workflow-execute-spikes` closes a
+   finished spike as the unblock signal.) Child tasks reaching here read `open`
+   with `ex:done` — the expected steady state before ship, not a missed update.
 3. **Do NOT auto-promote the next epic.** Identify the next open epic by priority
    (P0 → P1 → P2 → P3 → P4) and name it in the Step 7 report, but never run
    `beads:update <next-epic-id> --status=in_progress` here — marking the next epic

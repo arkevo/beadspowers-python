@@ -553,8 +553,8 @@ table:
   are append-only, so an old `ex:blocked` next to a later `ex:done` is history,
   not a blocker;
 - no `Smoke gate:` bead under the epic is open;
-- no child is `wp:deferred`, unplanned (no `wp:*` label), or not started (no
-  `ex:*` label);
+- no open child is still deferred (`wp:deferred` with no later `wp:approved`),
+  unplanned (no `wp:*` label), or not started (no `ex:*` or `sk:*` label);
 - no attended or ops child is open — a migration apply, a cloud-console step, a
   release gate.
 
@@ -715,10 +715,12 @@ Do not notify for purely automated transitions (autonomous execute/QA/auto-merge
 - **This command never changes bead status.** Never call `beads:update --status`
   here — not to claim a task, not to finish one. The `ex:*` labels are this lane's
   only progress record, and `/workflow-commands:workflow-ship-epic` makes the
-  single status transition (open → closed) at the end. "Mark `in_progress` when
-  starting" is a single-task-lane rule; carried into a batch run it adds a second
-  status writer that nothing ever clears, so tasks strand in `in_progress` and the
-  epic reads as a mix of whichever writes happened to land (observed in a
+  single status transition (open → closed) at the end. The one exception is a
+  `Smoke gate:` bead this command created itself: Step 6 closes it when the smoke
+  passes, which is what unblocks the tasks wired behind it. "Mark `in_progress`
+  when starting" is a single-task-lane rule; carried into a batch run it adds a
+  second status writer that nothing ever clears, so tasks strand in `in_progress`
+  and the epic reads as a mix of whichever writes happened to land (observed in a
   downstream project). "Reopen the task" in Step 6 means another fix pass on the
   code, not a status change. See the router's *Workflow Rules* section.
 - **Read back every label write, and keep bead writes serial.** After each

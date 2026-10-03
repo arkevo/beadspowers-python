@@ -156,7 +156,9 @@ Do not recommend, offer or ask about `/workflow-commands:workflow-ship-epic` —
 Completion Report "Next", an options list, a closing question, anywhere — while any task
 in the epic is left. "Left" means any open child that is not `ex:done`, any open
 "Smoke gate:" bead, any `wp:deferred`, unplanned or unstarted child, and any open
-attended or ops child (a migration apply, a cloud console step, a release gate). Read
+attended or ops child (a migration apply, a cloud console step, a release gate).
+Only open children count: a closed spike or a closed bug is not left, and
+`wp:deferred` no longer counts once a later `wp:approved` outranks it. Read
 these from `bd list` in the same turn.
 
 Recommend the step that finishes the remaining work instead. A smoke that needs the
@@ -383,6 +385,10 @@ are often parallelizable even when the plan as a whole is not.
   never writes status — the `ex:*` labels are the only progress record — and
   `workflow-commands:workflow-ship-epic` makes the single transition, open → closed,
   when it opens the epic's PR; there, `beads:update` is for labels and fields only.
+  This covers the epic and its implementation tasks:
+  `workflow-commands:workflow-execute-plans` still closes the `Smoke gate:` beads it
+  creates, and `workflow-commands:workflow-execute-spikes` closes a finished spike as
+  the unblock signal.
 
   Why: "mark `in_progress` when starting" is a single-task rule. In a batch run it adds
   a second status writer nothing ever clears, and the epic ends up reading as a mix of
