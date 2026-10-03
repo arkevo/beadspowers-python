@@ -592,9 +592,28 @@ every task's `ex:*` / `wp:*` label via `beads:show` / `beads:list` and say:
   (Step 0a), say so and scope the "fully executed" check to that whole
   closure, not just the named epic.
 
-State the single next command plainly — `/workflow-commands:workflow-ship-epic <epic-id>` when
-fully done, the fix/plan command otherwise — rather than a menu of every
-possibility.
+**Next.** Close the report with the next steps as a short numbered list. `/clear`
+is its own step before each next-phase command, and the list holds only what
+applies now — never a menu of every possibility:
+
+- **Nothing left** (the ship-recommendation gate below passes):
+  1. `/clear`
+  2. `/workflow-commands:workflow-ship-epic <epic-id>` — opens the epic's PR and
+     closes its tasks; it stops at its own confirmation gate first.
+  3. Merge the PR.
+  4. `/workflow-commands:workflow-ship-epic <epic-id>` again — confirms the merge
+     and marks the epic shipped.
+- **Deferred tasks this wave unblocked:**
+  1. `/clear`
+  2. `/workflow-commands:workflow-writing-plans <epic-id>` — plans them.
+- **Refused at Step 0b:**
+  1. `/clear`
+  2. `/workflow-commands:workflow-writing-plans <epic-id>` — finishes planning.
+- **A blocked bug, an open smoke gate, or an ops step:** the step that finishes
+  it, as the gate below names it. Once it is done:
+  1. `/clear`
+  2. `/workflow-commands:workflow-execute-plans <epic-id>` — resumes from the
+     `ex:*` labels.
 
 ### Ship-recommendation gate (HARD RULE)
 

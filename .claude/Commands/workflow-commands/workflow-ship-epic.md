@@ -329,18 +329,27 @@ this was:
 - **The confirming re-run — merged.** Step 0 found the PR merged and added
   `sh:shipped`; report the epic as shipped.
 
-Show what is now unblocked, the branch / PR URL, and recommend `/clear` before the next
-epic. Name the next open epic by priority (Step 6) as information, and ask whether the
-user wants it marked `in_progress` — never do so automatically. Use `/workflow-commands:beads-ship-task`'s
-response formats (epic-not-complete / epic-complete / project-complete) adapted to the
-epic level.
+Report in the same plain-language style as the rest of the pipeline, not a bare
+label dump, using `/workflow-commands:beads-ship-task`'s response formats
+(epic-not-complete / epic-complete / project-complete) adapted to the epic level.
+Say what beads work the closure unblocked (any task whose `blocks` edge pointed
+here). Close with the next steps as a numbered list in which `/clear` is its own
+step before the next phase's command:
 
-Give this in the same plain-language style as the rest of the pipeline's status
-reports, not a bare label dump: name the epic that just shipped, say what beads
-work is now unblocked by its closure (any task whose `blocks` edge pointed
-here), and state the single next command — normally `/workflow-commands:workflow-planning-sequence`
-or `/workflow-commands:workflow-execution-sequence` for whatever epic is next by priority (Step 6),
-or nothing further if no open epics remain.
+- **After the first run, or a re-run before the merge:**
+  1. Merge the PR.
+  2. `/workflow-commands:workflow-ship-epic <epic-id>` again — confirms the merge
+     and marks the epic shipped.
+- **After the confirming re-run:** name the next open epic by priority (Step 6)
+  as information and ask whether the user wants it marked `in_progress` — never
+  do so automatically. Then:
+  1. `/clear`
+  2. The next epic's first batch command:
+     `/workflow-commands:workflow-planning-sequence --epic <next-epic-id>` when its
+     tasks have not been sequenced yet; otherwise the batch command for the
+     earliest pipeline stage holding two or more of its tasks (the router's
+     *Recommending What's Next — Batch Beats Single-Task* section). Nothing
+     further if no open epics remain.
 
 ---
 

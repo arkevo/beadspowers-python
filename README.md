@@ -1,374 +1,110 @@
 # Beadspowers: Python
 
-A structured AI-assisted development workflow for Claude Code that combines
-**Beads** (git-backed issue tracking) with **Superpowers** (plan-execute-verify lifecycle) into an enforced sequence.
+Beadspowers is a Claude Code workflow for Python projects that combines **Beads** issue tracking with the **Superpowers** plan → execute → verify lifecycle, and enforces the order. Work one task at a time with you in the loop, or hand Claude a whole epic to plan and build across parallel agents.
 
-It ships **two lanes** that share one rule set:
+## Set up (once per project)
 
-```
-Single-task   Start -> Plan -> Refine -> Execute -> Verify -> Ship (PR)
-Epic-batch    Spec  -> Sequence -> Plan all -> Order -> Build all -> Ship epic
-```
+1. Install the system tools (the workflow is verified with beads 1.0.4):
 
-The **single-task** lane is the default: one Beads task, you in the loop at every
-gate. The **epic-batch** lane takes a whole epic and fans it out across detached
-Claude Workflow runs — one agent per task, worktree-isolated — stopping only at
-budget gates and a few review/smoke/ship gates. Scope picks the lane, not
-phrasing: one task → single-task; an epic or a spec → epic-batch.
+   ```bash
+   brew install jq gh
+   gh auth login
+   npm install -g @beads/bd
+   ```
 
-## The epic-batch process
+2. Install the plugins, inside Claude Code:
+
+   ```
+   /plugin marketplace add steveyegge/beads
+   /plugin install beads@beads-marketplace
+   /plugin install superpowers@claude-plugins-official
+   /plugin install commit-commands@claude-plugins-official
+   /plugin marketplace add openai/codex-plugin-cc
+   /plugin install codex@openai-codex
+   ```
+
+   The last two lines add the Codex plugin. Only the full verification tier's adversarial review uses it, so skip them if you don't use Codex.
+
+3. From your project root, start a setup branch and copy the workflow in. `cp -n` never overwrites your files (it exits 1 when it skips one). If you already had a `.claude/settings.json`, merge this repo's `hooks` and `enabledPlugins` into it by hand.
+
+   ```bash
+   git switch -c chore/workflow-setup
+   cp -rn /path/to/beadspowers-python/.claude/ .claude/
+   ```
+
+4. Make the hooks executable:
+
+   ```bash
+   chmod +x .claude/hooks/*.sh
+   ```
+
+5. Set up beads. `bd init` makes its own commit on the current branch. Beads sync through a Dolt remote on your git host, and `.beads/issues.jsonl` stays an untracked, readable export. The workflow's own state files (`.session-state.json`, `.workflow-step`, `.verification-done`) are ignored too, so a ship never commits them. The final `bd dolt push` seeds the new remote once: until it holds data, `bd dolt pull` fails with "no branches found". Pushing publishes your beads on that remote (a `refs/dolt/data` ref in the same repository), so on a public repository the bead text is public.
+
+   ```bash
+   bd init --skip-agents
+   bd config set export.git-add false
+   printf '\nno-auto-import: true\n' >> .beads/config.yaml
+   printf '\nissues.jsonl\n.session-state.json\n.workflow-step\n.verification-done\n' >> .beads/.gitignore
+   git rm --cached --ignore-unmatch .beads/issues.jsonl
+   bd dolt remote add origin git+https://github.com/<owner>/<repo>.git
+   bd dolt push
+   ```
+
+6. Find the placeholders and replace each one with your project's value:
+
+   ```bash
+   grep -rn -e '<owner>/<repo>' -e 'src/<your_package>/' -e '<project>_test' -e '<run-command>' .claude/
+   ```
+
+7. Commit the setup and open a PR. Merge it before your first task, because task branches start from the trunk.
+
+   ```bash
+   git add .claude .beads/config.yaml .beads/.gitignore
+   git commit -m "chore: add the Beadspowers workflow"
+   git push -u origin HEAD
+   gh pr create --fill
+   ```
+
+8. Start a new Claude Code session in the project.
+
+## One task
+
+1. `/beads:ready`
+2. `/workflow-commands:beads-start-task <task-id>` — Claude announces the lane; in Lane C it asks the refinement questions and the execution choice.
+3. Verification runs automatically after execution.
+4. `/workflow-commands:beads-ship-task` — opens the PR and closes the bead.
+5. Merge the PR.
+6. `/clear`
+
+## An epic
 
 ![Epic-batch workflow](docs/workflow-process-flow.drawio.png)
 
-*Editable source: [`docs/workflow-process-flow.drawio`](docs/workflow-process-flow.drawio) (the PNG has the diagram XML embedded, so draw.io can open either one).*
-
-| Step | You run | You get |
-|------|---------|---------|
-| **0** | Create a worktree + branch | An isolated workspace |
-| **1** | `superpowers:brainstorming` | A spec / design document |
-| **2** | `/workflow-commands:workflow-planning-sequence` | An epic + tasks, classified and ordered into planning waves |
-| **3a** | `/workflow-commands:workflow-execute-spikes` *(only if there are `SPIKE-FIRST` tasks)* | Findings files; closing a spike unblocks its `EXEC-GATED` dependents |
-| **3b** | `/workflow-commands:workflow-writing-plans` | One approved plan per task (`wp:approved`) |
-| **4** | `/workflow-commands:workflow-execution-sequence` | Execution waves + a plan-coverage gate |
-| **5** | `/workflow-commands:workflow-execute-plans` | Implemented, QA'd tasks (`ex:done`) |
-| **6** | `/workflow-commands:workflow-ship-epic` | One PR for the whole epic (`sh:shipped`) |
-
-**If tasks are left over after step 5,** go back to the phase those tasks are
-actually in — unplanned tasks re-enter at **3b**, unordered ones at **4**. The
-`wp:*` / `sk:*` / `ex:*` / `sh:*` Beads labels tell you where each one stopped,
-which is also what makes a crashed or interrupted run resumable. There is
-deliberately no separate status command.
-
-> ### ⚠️ Context hygiene — applies at every step
->
-> When your context exceeds roughly **30–50% of 1M**, ask Claude to
-> **"give you a handoff doc for the next session while prioritizing the workflow
-> rules"**, then `/clear` and paste that doc back in to restart with clean
-> context. Long sessions degrade the workflow before they degrade the code — the
-> router and the hard stops are the first things to fall out of an overfull
-> context, and once they do, steps get silently skipped.
-
-## Features
-
-### Verification
-
-Python-specific multi-phase verification with three tiers. After execution completes, the workflow recommends the appropriate tier based on change size.
-
-| Tier | Phases | When to Use |
-|------|--------|-------------|
-| **Quick** | Lint + tests | Small changes (< 50 lines), hotfixes |
-| **Standard** | Lint + code review + architecture + simplification + tests | Normal tasks (50-200 lines) |
-| **Full** | All 13 phases with parallel agents (lint through security) | Major features (200+ lines), pre-release |
-
-**Tooling:** ruff (lint/format), mypy (type checking), pytest (tests), python -m build (packaging).
-
-Verification is a **hard gate, not a suggestion**. `workflow-commands:beads-ship-task` refuses to
-ship until a `python-verification-{level}` skill has run and written
-`.beads/.verification-done`; in the batch lane the equivalent is a per-task
-`ex:qa:<level>` label. Running `pytest` or `ruff` by hand does **not** satisfy
-either — only the named skill does.
-
-### Plan Refinement
-
-After Superpowers planning completes, Claude analyzes the plan and asks targeted questions — a mix of Critical, Recommended, and Nice-to-Have — to refine the plan before execution. Each question includes options with reasoning and a recommendation. Skip at any stage by typing "skip."
-
-One methodology, two modes: the single-task lane runs it **interactively**
-(`workflow-commands:plan-refinement-qa`, live Q&A); the batch lane runs the same engine
-**autonomously** inside `workflow-commands:workflow-writing-plans` Step 4, because a detached
-Workflow cannot pause for input. Shared logic lives in
-`Commands/workflow-commands/references/refinement-methodology.md`.
-
-### Enforced Workflow Sequence
-
-The router (`beads-workflow-router.md`) is the authority document — it outranks
-any "next step" handoff a skill suggests at its own end. It enforces:
-
-1. **Start** — `workflow-commands:beads-start-task` marks the issue `in_progress`, creates a feature branch
-2. **Plan** — `superpowers:writing-plans` writes a plan to `docs/plans/`
-3. **Refine** — `workflow-commands:plan-refinement-qa` runs Q&A to stress-test the plan
-4. **Summarize** — `workflow-commands:plan-summary-console` prints the refined plan in the console
-5. **Execute** — User chooses sequential (`superpowers:executing-plans`) or parallel (`superpowers:subagent-driven-development`)
-6. **Verify** — `workflow-commands:beads-post-execution` auto-invokes, runs the matching verification tier
-7. **Ship** — `workflow-commands:beads-ship-task` commits, pushes, opens a PR, closes the beads issue
-
-Plus these hard stops: no direct coding after task start; `systematic-debugging`
-first on `bug` tasks; verification before any ship or "done"; ready-task lists
-scoped to the active epic; and a standing posture that **named scope is
-authorization** (with an explicit hard-lock list that isn't).
-
-### Natural Language Triggers
-
-**Single-task lane**
-
-| Say This | Invokes |
-|----------|---------|
-| "What's ready?" | `beads:ready` (scoped to active epic) |
-| "I'm starting [task]" | `workflow-commands:beads-start-task` |
-| "Plan this" | `superpowers:writing-plans` |
-| "Refine the plan" | `workflow-commands:plan-refinement-qa` |
-| "Summarize the plan" | `workflow-commands:plan-summary-console` |
-| "Execute the plan" | Execution gate (sequential vs subagent-driven) |
-| "Ship it" | `workflow-commands:beads-ship-task` (always opens a PR) |
-| "Quick verify" | `workflow-commands:python-verification-quick` |
-| "Standard verify" | `workflow-commands:python-verification-standard` |
-| "Full verify" | `workflow-commands:python-verification-full` |
-| "I found a critical bug" | `workflow-commands:hotfix-interrupt` |
-| "Export progress" | `workflow-commands:beads-export-progress` |
-
-**Epic-batch lane** — these need the word *epic* (or a spec) to route here
-
-| Say This | Invokes |
-|----------|---------|
-| "Decompose this spec" / "Sequence the spec" | `workflow-commands:workflow-planning-sequence` |
-| "Plan the epic" / "Write all the plans" | `workflow-commands:workflow-writing-plans` |
-| "Run the spikes" | `workflow-commands:workflow-execute-spikes` |
-| "What order do I ship this epic?" | `workflow-commands:workflow-execution-sequence` |
-| "Execute the epic" / "Build the whole epic" | `workflow-commands:workflow-execute-plans` |
-| "Ship the epic" | `workflow-commands:workflow-ship-epic` |
-
-When scope is genuinely ambiguous, Claude asks before fanning out — the batch
-lane spends real multi-agent budget and a wrong guess is expensive.
-
-## Prerequisites
-
-### Claude Code
-
-Install [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (CLI, desktop app, or IDE extension).
-
-### Required Plugins
-
-Install these Claude Code plugins in order. Run each command inside Claude Code (not your shell).
-
-#### 1. Beads (git-backed issue tracker)
-
-```
-/install-plugin beads from steveyegge/beads
-```
-
-- **What it provides:** `beads:*` skills (create, list, show, ready, close, sync, etc.) and the `bd` CLI for git-backed issue tracking
-- **Scope:** user (available across all projects)
-- **Repo:** [steveyegge/beads](https://github.com/steveyegge/beads)
-
-After installing, initialize beads in your project:
-
-```bash
-bd init
-```
-
-#### 2. Superpowers
-
-```
-/install-plugin superpowers from anthropics/claude-plugins-official
-```
-
-- **What it provides:** `superpowers:*` skills (writing-plans, executing-plans, subagent-driven-development, brainstorming, systematic-debugging, test-driven-development, verification-before-completion, etc.)
-- **Scope:** project
-- **Repo:** [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official)
-
-#### 3. Commit Commands
-
-```
-/install-plugin commit-commands from anthropics/claude-plugins-official
-```
-
-- **What it provides:** `commit-commands:*` skills (commit, commit-push, commit-push-pr, clean_gone)
-- **Scope:** project
-
-
-### System Dependencies
-
-The hooks in `.claude/hooks/` require:
-
-| Tool | Purpose | Install |
-|------|---------|---------|
-| `jq` | JSON parsing in hook scripts | `brew install jq` (macOS) |
-| `gh` | GitHub CLI for PR creation and code review | `brew install gh` then `gh auth login` |
-
-## Installation
-
-### 1. Copy the `.claude/` folder
-
-Merge the contents of this repo's `.claude/` directory into your target project's `.claude/` directory:
-
-```bash
-# From your target project root:
-cp -rn /path/to/this-repo/.claude/ .claude/
-```
-
-> **Note:** Use `cp -rn` (no-clobber) to avoid overwriting existing files. If you already have a `.claude/settings.json`, merge the `hooks` section manually.
-
-### 2. Merge settings.json
-
-If your project already has `.claude/settings.json`, merge these sections from the exported `settings.json`:
-
-**Hooks** (required for automation):
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/validate-bash.sh" }]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/write-safety.sh" }]
-      }
-    ]
-  }
-}
-```
-
-**Enabled plugins** (add to your existing list):
-
-```json
-{
-  "enabledPlugins": {
-    "commit-commands@claude-plugins-official": true,
-    "superpowers@claude-plugins-official": true,
-  }
-}
-```
-
-### 3. Make hooks executable
-
-```bash
-chmod +x .claude/hooks/*.sh
-```
-
-### 4. Initialize Beads
-
-> **Skip this step** if you already have a `.beads/` directory or have previously installed Beads in your project.
-
-```bash
-bd init
-```
-
-This creates the `.beads/` directory for issue tracking.
-
-### 5. Replace the placeholders
-
-These files are written to work as-is except for a handful of angle-bracket
-placeholders. Search `.claude/` for them and substitute your project's values:
-
-| Placeholder | Replace with |
-|-------------|--------------|
-| `<owner>/<repo>` | Your GitHub repo |
-| `src/<your_package>/` | Your package path |
-| `<project>_test` | Your test database name |
-| `<run-command>` | How your project starts (`python -m yourpkg`, `uvicorn app:main`, a CLI entrypoint…) |
-| `<epic-id>` / `<task-id>` | Illustrative only — no change needed |
-
-Also review the two git conventions the workflow assumes, and relax them
-together if your project differs: **PRs are required** (no direct push to
-`master` / `main`), and branch prefixes are `feat/`, `fix/`, `refactor/`,
-`exp/`, `hotfix/`, `chore/`.
-
-## What's Included
-
-```
-.claude/
-├── agents/                              # Parallel verification subagents
-│   ├── verification-comment-analyzer.md # Docstring + comment quality
-│   ├── verification-silent-failure.md   # Error handling gaps
-│   ├── verification-test-coverage.md    # Test coverage analysis
-│   └── verification-type-analyzer.md    # Type design quality
-├── Commands/
-│   └── workflow-commands/               # Custom workflow skills
-│       ├── beads-start-task.md          # Start task + create branch
-│       ├── beads-ship-task.md           # Commit, PR, branch cleanup, close task
-│       ├── beads-post-execution.md      # Post-execution verification
-│       ├── beads-export-progress.md     # Regenerate a PROGRESS.md snapshot
-│       ├── plan-refinement-qa.md        # Plan Q&A before execution
-│       ├── plan-summary-console.md      # Console recap of the refined plan
-│       ├── hotfix-interrupt.md          # Emergency hotfix flow
-│       ├── python-verification-*.md     # Quick/Standard/Full tiers
-│       ├── P02–P14 phases               # Individual verification phases
-│       ├── tdd-test-writer.md           # TDD test scaffolding
-│       ├── workflow-planning-sequence.md   # Spec/epic -> classified planning waves
-│       ├── workflow-writing-plans.md       # Fan-out plan authoring + refinement
-│       ├── workflow-execute-spikes.md      # Throwaway prototypes -> findings
-│       ├── workflow-execution-sequence.md  # Execution waves + plan-coverage gate
-│       ├── workflow-execute-plans.md       # Worktree fan-out, TDD, QA, smoke
-│       ├── workflow-ship-epic.md           # Integrate + close a whole epic
-│       └── references/
-│           └── refinement-methodology.md   # Shared refinement engine (both modes)
-├── hooks/                               # Shell automation scripts
-│   ├── validate-bash.sh                 # Pre-validate bash commands
-│   └── write-safety.sh                  # Prevent writes to protected paths
-├── rules/
-│   ├── 0_Beads x Superpowers/
-│   │   ├── beads-workflow-router.md     # Authority doc: NL -> skill routing + hard stops
-│   │   ├── skill-usage.md               # Fully-qualified skill names + naming conventions
-│   │   ├── beads-plugin-cli-only.md     # The beads plugin has no MCP layer
-│   │   └── bug-must-have-epic.md        # Every bug gets an epic parent
-│   ├── Git Best Practices/
-│   │   ├── Git Best Practices.md        # Branch naming, releases, rollback
-│   │   ├── no-direct-push-to-master.md  # PRs required
-│   │   └── protect_plans_and_commit_all.md  # Plans are permanent; safe staging
-│   └── critical ai agent rule.md        # Hard locks: destructive git, cloud, branches
-├── settings.json                        # Hook wiring + plugin enables
-docs/
-├── workflow-process-flow.drawio         # Editable process diagram
-└── workflow-process-flow.drawio.png     # Rendered, with XML embedded
-```
-
-### Verification Phases (Full)
-
-| Phase | Skill | Tier |
-|-------|-------|------|
-| P02 | Lint Issues Fix (ruff + mypy) | Quick, Standard, Full |
-| P03 | Code Review Checks | Standard, Full |
-| P04 | Architecture Validation (5-layer) | Standard, Full |
-| P05 | Code Simplification Review | Standard, Full |
-| P06 | Type Design Analysis | Full (agent) |
-| P07 | Silent Failure Hunt | Full (agent) |
-| P08 | Comment/Docstring Analysis | Full (agent) |
-| P09 | Confidence Scoring | Standard, Full |
-| P10 | False Positive Filtering | Standard, Full |
-| P11 | Final Verification (ruff + pytest) | Quick, Standard, Full |
-| P11.5 | Build Validation (python -m build) | Full |
-| P12 | Test Coverage Analysis | Full (agent) |
-| P14 | Security Review (auto-triggered) | Standard, Full |
-
-### Architecture Layers
-
-The verification phases validate against a 5-layer Python architecture:
-
-| Layer | Purpose | Allowed Dependencies |
-|-------|---------|---------------------|
-| **API/CLI** | Routes, CLI commands, entry points | Services, Core |
-| **Services** | Business logic, orchestration | Domain, Data, Core |
-| **Domain** | Core business rules, entities | Core only |
-| **Data** | Repositories, database access | Core only |
-| **Core** | Shared utilities, config | None (leaf layer) |
-
-## Customization
-
-### Verification Phases
-
-The P02–P14 phase commands and verification agents are Python-focused, using **ruff** for linting/formatting, **mypy** for type checking, and **pytest** for testing. To adapt for other languages, modify the phase files and agents in `.claude/Commands/workflow-commands/` and `.claude/agents/`, and rename the `python-verification-*` skills — the router and `workflow-commands:beads-post-execution` reference them by name.
-
-### Model tiers in the batch lane
-
-The `workflow-*` commands pin a model **tier** (`opus` / `sonnet`), never a
-version. Tiers resolve to whatever generation the session runs, which is what
-keeps these files from going stale; a versioned id like `claude-opus-4-8` is not
-a valid `opts.model` value and would pin the fan-out to a superseded model. The
-tier is settled configuration — it is never printed in a budget preview and
-never offered to the user as a choice.
-
-### Adding a design-fidelity gate
-
-`workflow-commands:workflow-execute-plans` assumes no visual surface. If your project has a UI
-worth checking against a design source, add a stage label between
-`ex:qa:<level>` and `ex:done` and gate on it the same way the QA level is gated.
-
-### settings.json
-
-The exported `settings.json` includes permissions and plugin enables. Review and adjust:
-
-- `permissions.allow` — Empty by default; add tool-specific permissions as needed
-- `permissions.deny` — Add safety rails as needed (e.g., prevent destructive commands)
-- `enabledPlugins` — Keep superpowers and commit-commands; remove any you don't use
+1. `git worktree add ../<project>-<epic> -b feat/<epic-slug>`, then `cd ../<project>-<epic> && claude`
+2. `/superpowers:brainstorming` — the approved spec lands in `docs/plans/`.
+3. `/clear`
+4. `/workflow-commands:workflow-planning-sequence --spec docs/plans/<date>-<topic>-design.md` — creates the epic; note its id.
+5. `/clear`
+6. `/workflow-commands:workflow-writing-plans <epic-id>`
+7. `/clear`
+8. Only if the epic has spike tasks: `/workflow-commands:workflow-execute-spikes <epic-id>`, then `/clear`, then `/workflow-commands:workflow-writing-plans <epic-id>` again (it plans the tasks the spikes unblocked), then `/clear`.
+9. `/workflow-commands:workflow-execution-sequence <epic-id>`
+10. `/clear`
+11. `/workflow-commands:workflow-execute-plans <epic-id>`
+12. `/clear`
+13. `/workflow-commands:workflow-ship-epic <epic-id>` — opens the PR.
+14. Merge the PR.
+15. `/workflow-commands:workflow-ship-epic <epic-id>` again — confirms the merge and marks the epic shipped.
+16. `/clear`
+
+If tasks are left over after step 11, unplanned ones go back to step 6 and unordered ones to step 9.
+
+**Context tip:** past roughly 30–50% of the context window in the middle of a phase, ask Claude for a handoff doc for the next session, `/clear`, and paste the doc back in.
+
+## What's inside
+
+- `.claude/rules/` — the router (`0_Beads x Superpowers/beads-workflow-router.md`) and the rules it enforces; start here.
+- `.claude/Commands/workflow-commands/` — the single-task and epic-batch commands, plus the `python-verification-*` tiers.
+- `.claude/agents/` — the review agents the full verification tier runs.
+- `.claude/skills/` — troubleshooting skills, such as beads in a worktree.
+- `.claude/hooks/` — the Bash and file-write safety hooks wired up in `settings.json`.

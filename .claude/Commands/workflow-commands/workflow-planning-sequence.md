@@ -327,15 +327,18 @@ and why, and the exact next command. Cover:
   lives outside this epic, say so plainly; resolving that is
   `/workflow-commands:workflow-execution-sequence`'s job, not something this command does.
 
-State the single next command plainly:
+State the next steps plainly, with `/clear` as its own step — planning starts
+in a fresh context, and the sequence file and beads carry everything it needs:
 
 ```
-/workflow-commands:workflow-writing-plans <epic-id-or-sequence-file-path>
+1. /clear
+2. /workflow-commands:workflow-writing-plans <epic-id-or-sequence-file-path>
 ```
 
 and remind the user this first run only drafts the plannable wave(s) — later
-waves reappear automatically on a future `workflow-commands:workflow-writing-plans` re-run once
-their upstream spikes/tasks are executed.
+waves reappear automatically on a future
+`/workflow-commands:workflow-writing-plans` re-run once their upstream
+spikes/tasks are executed.
 
 ---
 

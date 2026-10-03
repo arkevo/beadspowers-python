@@ -755,15 +755,34 @@ earlier wave) via `beads:show` / `beads:list`, and explain:
   depth or effort is different: it needs the owner's call — re-classify it with
   `/workflow-commands:workflow-planning-sequence`, or override it at the next
   preview — so present it as a decision, not a wait.
-- **Whether execution-sequence will matter** — if any approved task has a
-  cross-epic `blocks`-predecessor with no `exec:<slug>` label yet, note that
-  `/workflow-commands:workflow-execution-sequence` will be needed before `/workflow-commands:workflow-execute-plans`
-  can run on the full closure; otherwise say plainly that this epic is
-  self-contained and doesn't need it.
-- **The single next command** — if there's a plannable spike,
-  `/workflow-commands:workflow-execute-spikes <epic-id>`; if the currently-approved set is ready
-  to build, `/workflow-commands:workflow-execute-plans <epic-id>`; if nothing more can happen
-  until an earlier wave executes, say that plainly and name what's blocking it.
+- **Whether the closure crosses epics** — if any approved task has a cross-epic
+  `blocks`-predecessor with no `exec:<slug>` label yet, say that
+  `/workflow-commands:workflow-execution-sequence` is required before execution:
+  it labels the closure `exec:<slug>`, without which
+  `/workflow-commands:workflow-execute-plans` refuses the run. For a
+  self-contained epic, say that execution-sequence is still the next stage but
+  only confirms plan coverage and the execution order.
+- **The next steps**, as numbered lines with `/clear` as its own step before
+  the next phase's command (every phase reads what it needs from beads and
+  `docs/plans/`, so nothing is lost):
+  - An approved spike that has not been executed yet:
+
+    ```
+    1. /clear
+    2. /workflow-commands:workflow-execute-spikes <epic-id>
+    ```
+
+    and say that this command runs again after the spikes, to plan the tasks
+    their findings unblock.
+  - Otherwise, once the plannable tasks are approved:
+
+    ```
+    1. /clear
+    2. /workflow-commands:workflow-execution-sequence <epic-id>
+    ```
+
+  - If nothing more can happen until an earlier wave executes, say that plainly
+    and name what's blocking it.
 
 Keep this conversational, not a wall of tables — the goal is the same kind of
 walkthrough a human would want after checking an epic's status mid-pipeline.

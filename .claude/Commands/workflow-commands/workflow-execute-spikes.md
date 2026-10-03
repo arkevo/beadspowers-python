@@ -267,13 +267,18 @@ data is cleaned up). Pull every task's current stage (`wp:*` / `sk:*`) via
   hasn't run yet, or a task waiting on execution further downstream. Say so
   plainly; it's expected pipeline behavior, not an error.
 
-State the single next command plainly:
+Close with the next steps as a numbered list, `/clear` as its own step before the
+next phase's command. Normally:
 
 ```
-/workflow-commands:workflow-writing-plans <epic-id>
+1. /clear
+2. /workflow-commands:workflow-writing-plans <epic-id>
 ```
 
-and mention re-running this command instead if a further spike layer is next.
+That re-run plans every `EXEC-GATED` task these findings unblocked. When the next
+layer of spikes is already approved and was only waiting on the spikes that just
+closed, run this command again first instead: `/clear`, then
+`/workflow-commands:workflow-execute-spikes <epic-id>`.
 
 ---
 

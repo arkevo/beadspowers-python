@@ -208,11 +208,13 @@ state whether the closure is self-contained or spans multiple epics (and, if
 so, which ones), whether every closure task actually reached full approval
 this run or some are still gaps, and flag any `spike-first` task in the
 closure that still needs `/workflow-commands:workflow-execute-spikes` before it counts as
-executed. Restate the **execution-wave order**, then hand off with the single
-next command:
+executed. Restate the **execution-wave order**, then hand off with the next
+steps, `/clear` first — execution starts in a fresh context, and the plans and
+labels carry everything it needs:
 
 ```
-/workflow-commands:workflow-execute-plans <epic-id>
+1. /clear
+2. /workflow-commands:workflow-execute-plans <epic-id>
 ```
 
 ---
