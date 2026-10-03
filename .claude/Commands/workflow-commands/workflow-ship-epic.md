@@ -225,20 +225,27 @@ Advance the epic label to **`sh:shipped`**.
 
 ## Step 6.5: Publish Beads (team sync) [main ctx]
 
-After the epic + child tasks are closed (all beads mutations done), publish beads so
-teammates get the closure.
+Code and beads travel on two channels. Step 5's `git push` shipped the code; the
+closures from Step 6 still have to be published. Pull first, push last:
 
-**Default setup (`issues.jsonl` in git):** the beads changes are files in the repo —
-they ship with Step 5's commit. Nothing extra to do here.
-
-**Dolt-remote setup:** beads is a **second channel** that Step 5's `git push` did not
-ship:
 ```bash
-bd dolt pull        # fast-forward first
-bd dolt push        # publish the beads changes
+if bd dolt remote list 2>/dev/null | grep -q 'No remotes configured'; then
+  echo "Beads: no Dolt remote configured — skipping bd dolt pull and push."
+else
+  bd dolt pull && bd dolt push
+fi
 ```
-If the push is rejected as diverged, `bd dolt pull` and retry — never `--force` except
-a deliberate, agreed re-baseline.
+
+With no Dolt remote yet, this prints that one line and carries on: the beads stay
+in the local store, versioned by Dolt. (`bd dolt push` alone would skip quietly
+without a remote, but `bd dolt pull` fails outright, hence the check.) Add a remote
+later with `bd dolt remote add origin git+https://github.com/<owner>/<repo>.git`.
+If the push is rejected as diverged, `bd dolt pull` and retry; never `--force`
+except a deliberate, agreed re-baseline.
+
+Then refresh the readable export with `bd export -o .beads/issues.jsonl`. It is a
+snapshot for people and tools to read, not a sync channel, and it is never
+committed (`.claude/rules/0_Beads x Superpowers/beads.md`).
 
 > If you mirror Beads to an external tracker, reconcile it here — an epic close fires a
 > per-`bd close` hook once per child task plus once for the epic, and hooks fail

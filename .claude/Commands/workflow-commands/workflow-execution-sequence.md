@@ -69,7 +69,8 @@ Each step is tagged **[main ctx]** (needs the user / orchestrates) or **[script]
 Derive `<epic-slug>` (lowercase kebab from the title) for the artifact path.
 
 ### 2. [script] Compute the transitive blocks-closure
-Refresh the graph (`bd export --no-auto-import` writes `.beads/issues.jsonl`), then
+Refresh the readable export first (`bd export -o .beads/issues.jsonl`; plain
+`bd export` only prints to stdout), then
 traverse `dependencies[]` where `type == "blocks"` (ignore `parent-child`), starting
 from the epic's children, collecting every reachable task — **including cross-epic
 ones**. Exclude `closed` tasks (their edges are already satisfied).

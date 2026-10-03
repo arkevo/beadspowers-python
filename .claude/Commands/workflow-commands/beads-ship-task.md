@@ -107,20 +107,23 @@ After closing the task, check if the parent epic is fully complete:
 4. Promote the next epic: `bd update <next-epic-id> --status=in_progress` (only if it exists and is currently `open`).
 
 ## Step 6.5: Publish Beads (team sync)
-After all beads mutations (task closed, epic close/promote done), publish so
-teammates get them.
 
-**Default setup (`issues.jsonl` in git):** the beads changes are files in your
-repo — stage and commit them with the work in Step 2. Nothing extra to do here.
+After all beads mutations (task closed, epic closed or promoted), publish them.
+Code and beads travel on separate channels: Step 2's `git push` shipped the code,
+and this step ships the beads over the Dolt remote (`refs/dolt/data`).
+`.beads/issues.jsonl` is only a readable export — never stage or commit it.
 
-**Dolt-remote setup:** beads is a **second channel** and Step 2's `git push`
-did not ship it:
 ```bash
-bd dolt pull        # fast-forward first
-bd dolt push        # publish YOUR beads changes
+if bd dolt remote list 2>/dev/null | grep -q 'No remotes configured'; then
+  echo "Beads: no Dolt remote configured — skipping bd dolt push."
+else
+  bd dolt pull && bd dolt push   # fast-forward first, then publish your beads changes
+fi
 ```
-If the push is rejected as diverged, `bd dolt pull` and retry — never `--force`
-(only for a deliberate, agreed re-baseline).
+
+A project with no Dolt remote yet prints that one line and carries on. If the push
+is rejected as diverged, run `bd dolt pull` and retry — never `--force` (only for a
+deliberate, agreed re-baseline).
 
 ## Step 7: Show Unblocked Tasks
 Show what's now unblocked. If an epic is active, scope to that epic's tasks.
