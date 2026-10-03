@@ -128,6 +128,10 @@ On a brand-new, empty remote the pull itself fails with "no branches found in re
 seed it once with `bd dolt push` (which also publishes this ship's beads), and
 the pull-then-push works from then on.
 
+Then refresh the readable export with `bd export -o .beads/issues.jsonl`. It is a
+snapshot for people and tools to read, not a sync channel, and it is never
+committed (`.claude/rules/0_Beads x Superpowers/beads.md`).
+
 ## Step 7: Show Unblocked Tasks
 Show what's now unblocked. If an epic is active, scope to that epic's tasks.
 
