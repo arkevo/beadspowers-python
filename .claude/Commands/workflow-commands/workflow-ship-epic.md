@@ -1,5 +1,5 @@
 ---
-description: Ship a fully-executed beads epic — integrate the shared epic branch via a PR, close all child tasks + the epic, and report unblocked work. The batch analog of /beads-ship-task and the terminal step of the epic-batch pipeline. NEVER auto-runs; requires explicit invocation + a confirmation gate.
+description: Ship a fully-executed beads epic — integrate the shared epic branch via a PR, close all child tasks + the epic, and report unblocked work. The batch analog of /workflow-commands:beads-ship-task and the terminal step of the epic-batch pipeline. NEVER auto-runs; requires explicit invocation + a confirmation gate.
 ---
 
 # Workflow: Ship an Epic (Python)
@@ -7,10 +7,10 @@ description: Ship a fully-executed beads epic — integrate the shared epic bran
 Take a **fully-executed** beads epic and ship it: **integrate the shared epic
 branch** (commit + push, then offer how to integrate), **close the epic's child
 tasks + the epic**, and report what is now unblocked. This is the **batch analog of
-`/beads-ship-task`** (which ships a single task) and the **terminal step of the
+`/workflow-commands:beads-ship-task`** (which ships a single task) and the **terminal step of the
 epic-batch pipeline** —
-`/workflow-planning-sequence` → `/workflow-writing-plans` →
-`/workflow-execution-sequence` → `/workflow-execute-plans` → **this command**.
+`/workflow-commands:workflow-planning-sequence` → `/workflow-commands:workflow-writing-plans` →
+`/workflow-commands:workflow-execution-sequence` → `/workflow-commands:workflow-execute-plans` → **this command**.
 
 This command obeys the beads workflow router
 (`.claude/rules/0_Beads x Superpowers/beads-workflow-router.md`), the hard-lock rules
@@ -35,10 +35,10 @@ This command performs **outward-facing, hard-to-reverse actions**: it pushes,
 opens a PR, and closes the epic. Therefore:
 
 - **It NEVER runs as an automatic handoff.** No skill, no router rule, and
-  **`/workflow-execute-plans` in particular** may auto-invoke it. `execute-plans`
+  **`/workflow-commands:workflow-execute-plans` in particular** may auto-invoke it. `execute-plans`
   ends at `ex:done`; shipping is a **separate, deliberate** user action.
 - **It runs only when BOTH hold:** (1) the user **explicitly invokes**
-  `/workflow-ship-epic`, **and** (2) the user **confirms at the Step 4 ship gate**.
+  `/workflow-commands:workflow-ship-epic`, **and** (2) the user **confirms at the Step 4 ship gate**.
 - **It never merges to `main` on its own.** Merge-to-`main` is a destructive git
   action that needs **explicit owner confirmation** every time
   (`.claude/rules/critical ai agent rule.md`). The default is commit + push the epic
@@ -51,12 +51,12 @@ confirm the user actually wants to ship before doing anything.
 
 ## Core Principle — One Epic, One Integration
 
-The pipeline builds on **one shared epic branch** (`/workflow-writing-plans` writes
-one plan-file per task on that branch; `/workflow-execute-plans` merges each per-task
+The pipeline builds on **one shared epic branch** (`/workflow-commands:workflow-writing-plans` writes
+one plan-file per task on that branch; `/workflow-commands:workflow-execute-plans` merges each per-task
 worktree back into it on green QA + passed gates). Shipping therefore integrates that
 **one epic branch** as a single unit — not one PR/merge per task. That is the whole
 point of the batch pipeline: many tasks, one reviewable/integratable branch. (Contrast
-`/beads-ship-task`, which integrates a single task's branch.)
+`/workflow-commands:beads-ship-task`, which integrates a single task's branch.)
 
 ---
 
@@ -114,7 +114,7 @@ resume mechanism, mirroring `wp:*` / `ex:*`.
 This command ships only a **fully-executed** epic. Verify **every child task** of the
 epic carries **`ex:done`** (via `beads:show` / `beads:list`). If a cross-epic closure
 was executed (detected from the pre-existing `exec:<slug>` label set by
-`/workflow-execution-sequence`; see Step 2), verify every **closure** task is `ex:done`, not just the named
+`/workflow-commands:workflow-execution-sequence`; see Step 2), verify every **closure** task is `ex:done`, not just the named
 epic's children.
 
 If **any** task is `ex:blocked`, `ex:smoke-pending`, or lacks `ex:done`:
@@ -122,7 +122,7 @@ If **any** task is `ex:blocked`, `ex:smoke-pending`, or lacks `ex:done`:
 > ⚠️ Epic **<epic-id>** is not fully executed — cannot ship. Outstanding:
 > - <task-id> "<Title>" — <ex:blocked | ex:smoke-pending | not started>
 >
-> Finish execution with `/workflow-execute-plans` (resolve blocked bugs / run the
+> Finish execution with `/workflow-commands:workflow-execute-plans` (resolve blocked bugs / run the
 > batched smoke session) first.
 
 **Refuse to ship a partially-executed epic.** Also confirm you are on the epic's
@@ -131,7 +131,7 @@ un-merged).
 
 ## Step 2: Cross-Epic Closure Check [main ctx]
 
-Ties to the execution-closure model (`/workflow-execution-sequence`). If execution
+Ties to the execution-closure model (`/workflow-commands:workflow-execution-sequence`). If execution
 spanned **more than one epic** (an `exec:<slug>` closure label is present, or tasks
 from other epics were built into this branch), **STOP and ask** — never guess the
 integration strategy:
@@ -148,12 +148,12 @@ For a self-contained epic (closure == epic), skip straight to Step 3.
 ## Step 3: Assemble Integration Summary [main ctx]
 
 Build a change summary (used for the commit body and, if the user later chooses a PR,
-the PR body) in the **project's `/beads-ship-task` format**:
+the PR body) in the **project's `/workflow-commands:beads-ship-task` format**:
 
 - **Summary** — thorough technical summary, grouped by logical layer/component when
   the epic spans areas. The *what* and *why*, not file names. (May be drafted by the
   optional summarizer agent from the per-task plans under `docs/plans/<epic-slug>/`.)
-- **Test Results** — pull the **QA ledger** produced by `/workflow-execute-plans`
+- **Test Results** — pull the **QA ledger** produced by `/workflow-commands:workflow-execute-plans`
   (per-task `diff · level · skill · result`, plus the cumulative full-sweep line),
   test counts (passed/failed, pre-existing failures called out separately), new tests
   added, and the **batched smoke session** outcomes.
@@ -204,7 +204,7 @@ Advance the epic label to **`sh:pushed`** and echo the branch / PR URL.
 1. **Close each `ex:done` child task** still `open` via `beads:close` with a meaningful
    reason. (Idempotent — skip any already closed.)
 2. **Close the epic** via `beads:close` (`--reason="All child tasks completed"`).
-   Skip if `/workflow-execute-plans` already closed it.
+   Skip if `/workflow-commands:workflow-execute-plans` already closed it.
 3. **Do NOT auto-promote the next epic.** Identify the next open epic by priority
    (P0 → P1 → P2 → P3 → P4) and name it in the Step 7 report, but never run
    `beads:update <next-epic-id> --status=in_progress` here — marking the next epic
@@ -241,15 +241,15 @@ a deliberate, agreed re-baseline.
 
 Show what is now unblocked, the branch / PR URL, and recommend `/clear` before the next
 epic. Name the next open epic by priority (Step 6) as information, and ask whether the
-user wants it marked `in_progress` — never do so automatically. Use `/beads-ship-task`'s
+user wants it marked `in_progress` — never do so automatically. Use `/workflow-commands:beads-ship-task`'s
 response formats (epic-not-complete / epic-complete / project-complete) adapted to the
 epic level.
 
 Give this in the same plain-language style as the rest of the pipeline's status
 reports, not a bare label dump: name the epic that just shipped, say what beads
 work is now unblocked by its closure (any task whose `blocks` edge pointed
-here), and state the single next command — normally `/workflow-planning-sequence`
-or `/workflow-execution-sequence` for whatever epic is next by priority (Step 6),
+here), and state the single next command — normally `/workflow-commands:workflow-planning-sequence`
+or `/workflow-commands:workflow-execution-sequence` for whatever epic is next by priority (Step 6),
 or nothing further if no open epics remain.
 
 ---
@@ -272,9 +272,9 @@ Use `beads:label` / `beads:close` / `beads:show` / `beads:update` skills — nev
 
 - **Auto-invocation** — see the EXECUTION LOCK. This is always a deliberate user action.
 - **Merging to the trunk directly** — integration is always via the PR.
-- **Running tests / QA / smoke** — that is `/workflow-execute-plans`'s job; this command
+- **Running tests / QA / smoke** — that is `/workflow-commands:workflow-execute-plans`'s job; this command
   only *reports* the QA ledger + smoke outcomes it produced.
-- **Per-task integration** — the batch unit is the epic branch. Use `/beads-ship-task`
+- **Per-task integration** — the batch unit is the epic branch. Use `/workflow-commands:beads-ship-task`
   for single-task shipping.
 - **Multi-repo hub sync** — not part of this template (no `bd repo sync`).
 - **Creating or closing work in an external tracker** — any mirror is downstream,
@@ -297,7 +297,7 @@ Use `beads:label` / `beads:close` / `beads:show` / `beads:update` skills — nev
 - **Protected paths (`critical ai agent rule.md`):** if the epic's merged diff touched
   `migrations/`, managed-cloud resources, secrets/`.env`, or production deploy config,
   those tasks must already have been force-attended + approved in
-  `/workflow-execute-plans` Step 5 — re-confirm before integrating.
+  `/workflow-commands:workflow-execute-plans` Step 5 — re-confirm before integrating.
 - **Docs-before-push:** behavior-affecting changes ship with their doc updates.
 - **Any external tracker is downstream:** reconcile a mirror after closure if you have
   one; never treat it as the tracker.

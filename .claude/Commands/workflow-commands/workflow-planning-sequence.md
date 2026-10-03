@@ -1,5 +1,5 @@
 ---
-description: Compute a planning sequence from EITHER a design spec OR an existing beads epic — classifying each task by plan-readiness (plan-ready vs spike-first) and dependency type (parallel / sequential-plan / execution-gated), then emitting a planning-sequence file (machine block + human table) and writing the dependencies/labels. Precursor to /workflow-writing-plans, which consumes the emitted file.
+description: Compute a planning sequence from EITHER a design spec OR an existing beads epic — classifying each task by plan-readiness (plan-ready vs spike-first) and dependency type (parallel / sequential-plan / execution-gated), then emitting a planning-sequence file (machine block + human table) and writing the dependencies/labels. Precursor to /workflow-commands:workflow-writing-plans, which consumes the emitted file.
 ---
 
 # Workflow: Planning Sequence
@@ -10,11 +10,11 @@ epic: analyze the tasks, produce a **planning strategy** for each (plan-readines
 dependency edges + classification labels onto the epic.
 
 This is the **decomposition + sequencing** step that runs **before**
-`/workflow-writing-plans`. It answers: *what are the tasks, which need a spike before
+`/workflow-commands:workflow-writing-plans`. It answers: *what are the tasks, which need a spike before
 they can be planned, which can be planned in parallel, which must be planned
 sequentially, and which must be planned AND executed before a downstream task can
 even be planned.* The emitted planning-sequence file is the **contract**
-`/workflow-writing-plans` consumes.
+`/workflow-commands:workflow-writing-plans` consumes.
 
 This command obeys the beads workflow router
 (`.claude/rules/0_Beads x Superpowers/beads-workflow-router.md`) and the plan-location
@@ -201,7 +201,7 @@ Then, **in both modes**, write the classification onto the tasks:
 - Add dependencies with `beads:dep`: a `SEQ-PLAN` or `EXEC-GATED` edge → the
   dependent task `depends-on` the parent. Record the **edge type** in the
   dependent task's notes (`EXEC-GATED on <id>` / `SEQ-PLAN on <id>`) so
-  `/workflow-writing-plans` knows a spike must be **executed**, not merely
+  `/workflow-commands:workflow-writing-plans` knows a spike must be **executed**, not merely
   planned, before it plans the dependent.
 - Echo the epic id + task ids + the wave order.
 
@@ -210,7 +210,7 @@ Write `docs/plans/<epic-slug>/<date>-<epic-slug>-planning-sequence.md` with **tw
 synchronized representations, in one step:**
 
 1. **Machine-readable block** (frontmatter YAML or a fenced ```json) — the
-   authoritative contract `/workflow-writing-plans` parses. It carries `epic`
+   authoritative contract `/workflow-commands:workflow-writing-plans` parses. It carries `epic`
    (the epic id) plus a `tasks` array of `TASK_SCHEMA` objects **extended with**
    the real `bead_id`, `track`, and computed `wave` (`wave:n`) — `track` and
    `wave` augment the base TASK_SCHEMA fields. This is the
@@ -232,20 +232,20 @@ and why, and the exact next command. Cover:
   `PLAN-READY` + `PARALLEL`/already-satisfied ones).
 - **Spike gates** — name every `SPIKE-FIRST` task and what it roots. Its
   `EXEC-GATED` dependents are **not** planned until the spike is planned AND
-  **executed** (via `/workflow-execute-spikes`, later in the pipeline) — this
+  **executed** (via `/workflow-commands:workflow-execute-spikes`, later in the pipeline) — this
   is expected pipeline behavior, not an error state.
 - **Cross-epic dependencies (epic mode only)** — if any task's `blocks`-predecessor
   lives outside this epic, say so plainly; resolving that is
-  `/workflow-execution-sequence`'s job, not something this command does.
+  `/workflow-commands:workflow-execution-sequence`'s job, not something this command does.
 
 State the single next command plainly:
 
 ```
-/workflow-writing-plans <epic-id-or-sequence-file-path>
+/workflow-commands:workflow-writing-plans <epic-id-or-sequence-file-path>
 ```
 
 and remind the user this first run only drafts the plannable wave(s) — later
-waves reappear automatically on a future `workflow-writing-plans` re-run once
+waves reappear automatically on a future `workflow-commands:workflow-writing-plans` re-run once
 their upstream spikes/tasks are executed.
 
 ---
@@ -253,12 +253,12 @@ their upstream spikes/tasks are executed.
 ## Guardrails
 
 - **Never plan inside this command** — it only decomposes, classifies, persists,
-  and emits the sequence file. Planning is `/workflow-writing-plans`.
+  and emits the sequence file. Planning is `/workflow-commands:workflow-writing-plans`.
 - **Epic mode is non-destructive** — classify and label existing tasks only;
   never create, split, or merge them. Task granularity changes are the user's
   call, made before running this command in epic mode.
 - **Always emit the planning-sequence file** (Step 6) in both modes — it is the
-  contract `/workflow-writing-plans` consumes, with the authoritative `wave:n`.
+  contract `/workflow-commands:workflow-writing-plans` consumes, with the authoritative `wave:n`.
 - **Spikes are first-class tasks**, not informal asides — they get a beads task, a
   lightweight plan, and an execution before their dependents are planned.
 - **Prefer fewer, well-bounded tasks** (spec mode). Fold trivial pure modules into

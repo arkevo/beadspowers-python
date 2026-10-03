@@ -40,7 +40,7 @@ not by phrasing:
 - **Single-task (interactive).** One Beads task, with the user live in the loop.
   This is the default and everything in the "Natural Language → Skill Routing"
   table below (start → branch → plan → **refine** → summary → execution gate →
-  execute → verify → ship via `beads-ship-task`).
+  execute → verify → ship via `workflow-commands:beads-ship-task`).
 - **Epic-batch (autonomous fan-out).** A whole epic — or a spec that becomes an
   epic — fanned out across detached `Workflow` runs (one agent per task, Opus,
   worktree-isolated where it mutates files). The user is involved only at budget
@@ -50,9 +50,9 @@ not by phrasing:
 | Axis | Single-task (interactive) | Epic-batch (autonomous fan-out) |
 |---|---|---|
 | Scope | one Beads task | a whole epic / a spec |
-| Refinement | `plan-refinement-qa` — live Q&A in main ctx, honest/anti-quota question budget | `workflow-writing-plans` Step 4 — autonomous, fixed 5+5 quota, auto-selects |
-| Execution | Execution Gate → `superpowers:executing-plans` / `subagent-driven-development` | `workflow-execute-plans` — worktree fan-out, TDD, `python-verification-*`, batched smoke |
-| Spikes | handled inline in the one task | `workflow-execute-spikes` (throwaway prototype → findings) |
+| Refinement | `workflow-commands:plan-refinement-qa` — live Q&A in main ctx, honest/anti-quota question budget | `workflow-commands:workflow-writing-plans` Step 4 — autonomous, fixed 5+5 quota, auto-selects |
+| Execution | Execution Gate → `superpowers:executing-plans` / `subagent-driven-development` | `workflow-commands:workflow-execute-plans` — worktree fan-out, TDD, `python-verification-*`, batched smoke |
+| Spikes | handled inline in the one task | `workflow-commands:workflow-execute-spikes` (throwaway prototype → findings) |
 | Ship | `workflow-commands:beads-ship-task` (one task's branch) | `workflow-commands:workflow-ship-epic` (one shared epic branch) |
 | Resume state | `.beads/.workflow-step` file | per-task / per-epic Beads labels (`wp:*` / `sk:*` / `ex:*` / `sh:*`) |
 
@@ -83,12 +83,12 @@ When starting a Beads task whose type is `bug`, ALWAYS invoke `superpowers:syste
 
 The only way to skip this is if the user explicitly says "skip debugging skill" or "just plan it."
 
-**Closing the bug lifecycle:** this Hard Stop opens it; the **Hard Stop: Verification Before Ship / "Done"** (below) closes it. The bug path (`systematic-debugging → TDD`) still ends with `beads-post-execution` + a `python-verification-{level}` skill before ship/"done" — it is NOT exempt just because it skipped the plan/refine steps. This gap is how a bug fix reaches "done" unverified: the bug lane skips planning, so it also skips the place where verification usually gets remembered.
+**Closing the bug lifecycle:** this Hard Stop opens it; the **Hard Stop: Verification Before Ship / "Done"** (below) closes it. The bug path (`systematic-debugging → TDD`) still ends with `workflow-commands:beads-post-execution` + a `python-verification-{level}` skill before ship/"done" — it is NOT exempt just because it skipped the plan/refine steps. This gap is how a bug fix reaches "done" unverified: the bug lane skips planning, so it also skips the place where verification usually gets remembered.
 
 ## Hard Stop: Bootstrap Beads After EnterWorktree
 
 The batch lane runs worktree-isolated agents (`opts.isolation: 'worktree'` in
-`workflow-execute-plans` / `workflow-execute-spikes`). Under **beads embedded mode**
+`workflow-commands:workflow-execute-plans` / `workflow-commands:workflow-execute-spikes`). Under **beads embedded mode**
 (the current default — check yours with `bd dolt status`) there is **no required
 per-worktree bootstrap step**: a bare `git worktree add` checkout sees the FULL parent store via
 git-common-dir auto-detection, inheriting the git-tracked `.beads/metadata.json` and
@@ -139,10 +139,10 @@ When showing ready tasks, ALWAYS check `bd list --status=in_progress` for an act
 | "review this code" / "review my changes" | `workflow-commands:P03-code-review-checks-[SF]` |
 
 > **PR-policy note:** Per `Git Best Practices/no-direct-push-to-master.md`, **PRs
-> are required** — `beads-ship-task` commits, pushes the feature branch, and opens
+> are required** — `workflow-commands:beads-ship-task` commits, pushes the feature branch, and opens
 > a PR via `commit-commands:commit-push-pr`. Never commit or push directly to
 > `master` / `main`. If your project prefers optional PRs, relax it there and in
-> `beads-ship-task` together — the router and the ship skill must agree.
+> `workflow-commands:beads-ship-task` together — the router and the ship skill must agree.
 
 ---
 
@@ -174,7 +174,7 @@ epic-batch run already in flight (a task carrying `wp:*` / `ex:*` labels):
 
 | Ambiguous phrase | Single-task (default) | Epic-batch (needs "epic"/spec) |
 |---|---|---|
-| "Plan this" | `superpowers:writing-plans` → `plan-refinement-qa` | `workflow-commands:workflow-writing-plans` |
+| "Plan this" | `superpowers:writing-plans` → `workflow-commands:plan-refinement-qa` | `workflow-commands:workflow-writing-plans` |
 | "Execute the plan" | Execution Gate → `superpowers:executing-plans` / `subagent-driven-development` | `workflow-commands:workflow-execute-plans` |
 | "Ship it" / "Send it" | `workflow-commands:beads-ship-task` | `workflow-commands:workflow-ship-epic` |
 
@@ -189,16 +189,16 @@ multi-agent budget and a wrong guess is expensive.
 Canonical order of the six `workflow-*` commands:
 
 ```
-/workflow-planning-sequence   (spec → new epic+tasks, OR --epic → classify existing;
+/workflow-commands:workflow-planning-sequence   (spec → new epic+tasks, OR --epic → classify existing;
                                emits the planning-sequence file + wp deps/labels)
-   → /workflow-writing-plans   (plan wave-by-wave; SEQ-PLAN pipelines; defers EXEC-GATED) → wp:approved
-        ↘ /workflow-execute-spikes  (run SPIKE-FIRST → record findings → close)           → sk:done
-          └─ closing a spike is the UNBLOCK SIGNAL → re-run /workflow-writing-plans
+   → /workflow-commands:workflow-writing-plans   (plan wave-by-wave; SEQ-PLAN pipelines; defers EXEC-GATED) → wp:approved
+        ↘ /workflow-commands:workflow-execute-spikes  (run SPIKE-FIRST → record findings → close)           → sk:done
+          └─ closing a spike is the UNBLOCK SIGNAL → re-run /workflow-commands:workflow-writing-plans
              so EXEC-GATED dependents plan against the findings ────────────────────────────┘
-   → /workflow-execution-sequence  (blocks-closure → execution waves → plan-coverage gate;
+   → /workflow-commands:workflow-execution-sequence  (blocks-closure → execution waves → plan-coverage gate;
                                     labels exec:<slug> when the closure spans epics)
-   → /workflow-execute-plans   (worktree fan-out, TDD, python-verification, batched smoke) → ex:done
-   → /workflow-ship-epic       (integrate the one shared epic branch; close tasks + epic)  → sh:shipped
+   → /workflow-commands:workflow-execute-plans   (worktree fan-out, TDD, python-verification, batched smoke) → ex:done
+   → /workflow-commands:workflow-ship-epic       (integrate the one shared epic branch; close tasks + epic)  → sh:shipped
 ```
 
 **Hard stops (these live inside the commands; the router restates them as the authority doc):**
@@ -218,12 +218,12 @@ Canonical order of the six `workflow-*` commands:
   for the user.
 - **`execute-plans` refuses a bare cross-epic run with no `exec:<slug>` label.** If
   the epic has open cross-epic `blocks`-predecessors, run
-  `/workflow-execution-sequence` first to compute + label the closure — otherwise the
+  `/workflow-commands:workflow-execution-sequence` first to compute + label the closure — otherwise the
   enablers are silently skipped.
 - **Spikes never run through `execute-plans`.** Its epic-wide approval gate refuses
   while EXEC-GATED dependents are deliberately `wp:deferred`. Use
-  `/workflow-execute-spikes` (lightweight, gates only on the selected spikes).
-- **`execute-plans` ends at `ex:done`; it never auto-ships.** `/workflow-ship-epic`
+  `/workflow-commands:workflow-execute-spikes` (lightweight, gates only on the selected spikes).
+- **`execute-plans` ends at `ex:done`; it never auto-ships.** `/workflow-commands:workflow-ship-epic`
   **never auto-runs** and **never merges to the trunk** without explicit owner
   confirmation (EXECUTION LOCK + `critical ai agent rule.md`).
 - **EXEC-GATED defer→spike→re-run loop.** `EXEC-GATED` tasks are not planned until
@@ -254,11 +254,11 @@ label per task/epic):
 
 | Command | Label progression | Terminal |
 |---|---|---|
-| `workflow-writing-plans` | `wp:drafted` \| `wp:skipped` \| `wp:deferred` → `wp:refined-r1` → `wp:applied-r1` | `wp:approved` (+ plan `status: approved`) |
-| `workflow-execute-spikes` | `sk:running` → `sk:findings-recorded` | `sk:done` |
-| `workflow-execute-plans` | `ex:executing` → `ex:qa:<level>` → `ex:smoke-pending` | `ex:done` (or `ex:blocked`) |
-| `workflow-ship-epic` | `sh:pushed` | `sh:shipped` |
-| `workflow-execution-sequence` | `exec:<slug>` — durable cross-epic closure scope `execute-plans` consumes | — |
+| `workflow-commands:workflow-writing-plans` | `wp:drafted` \| `wp:skipped` \| `wp:deferred` → `wp:refined-r1` → `wp:applied-r1` | `wp:approved` (+ plan `status: approved`) |
+| `workflow-commands:workflow-execute-spikes` | `sk:running` → `sk:findings-recorded` | `sk:done` |
+| `workflow-commands:workflow-execute-plans` | `ex:executing` → `ex:qa:<level>` → `ex:smoke-pending` | `ex:done` (or `ex:blocked`) |
+| `workflow-commands:workflow-ship-epic` | `sh:pushed` | `sh:shipped` |
+| `workflow-commands:workflow-execution-sequence` | `exec:<slug>` — durable cross-epic closure scope `execute-plans` consumes | — |
 
 Read/advance these via the `beads:label` / `beads:update` skills — never raw `bd`
 in Bash (per `skill-usage.md`).
@@ -277,7 +277,7 @@ Examples of "named scope" authorization (proceed without re-asking):
 - "Delete `venv/` and `.pytest_cache/`" → delete those directories
 - "Add `httpx` to requirements" → run `pip install httpx` + edit `requirements.txt`
 - "Update the three files I listed" → edit exactly those
-- "Ship it" → run `beads-ship-task` per its own steps
+- "Ship it" → run `workflow-commands:beads-ship-task` per its own steps
 - "Remove `docs/plans/2026-01-old-thing.md`" → **reject** (plans are never
   deleted, per `Git Best Practices/protect_plans_and_commit_all.md` Rule 2)
 
@@ -309,7 +309,7 @@ The only way to skip refinement is if the user explicitly says "skip refinement"
 
 > **One methodology, two modes.** Refinement logic lives in
 > `workflow-commands/references/refinement-methodology.md`. The **single-task** path
-> uses `plan-refinement-qa` (**interactive** mode — live Q&A here in main context). The
+> uses `workflow-commands:plan-refinement-qa` (**interactive** mode — live Q&A here in main context). The
 > **batch** pipeline's `workflow-commands:workflow-writing-plans` performs refinement
 > itself in **autonomous** mode (its Step 4 — auto-select inside a `Workflow`, reviewed
 > at one end gate), because a detached Workflow cannot pause for input. The caller's
@@ -346,10 +346,10 @@ execution:
 - the **bug path** `superpowers:systematic-debugging → superpowers:test-driven-development` completing, **and**
 - **any direct TDD** implementation of a task (a small fix with no separate plan).
 
-`beads-post-execution` does the level detection (quick < 50 / standard 50–200 /
+`workflow-commands:beads-post-execution` does the level detection (quick < 50 / standard 50–200 /
 full 200+ lines) and runs the matching `python-verification-{level}` skill.
 
-**No substitution (HARD RULE — mirrors `workflow-execute-plans` Step 3):** running
+**No substitution (HARD RULE — mirrors `workflow-commands:workflow-execute-plans` Step 3):** running
 `pytest` / `ruff` / `mypy` by hand, a live smoke test, or a subagent's scoped
 tests do **NOT** count as verification. Only invoking the named
 `python-verification-{quick,standard,full}` **skill** counts — it writes the

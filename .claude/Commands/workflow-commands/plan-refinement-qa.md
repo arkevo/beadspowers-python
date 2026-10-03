@@ -6,7 +6,7 @@ description: Plan Refinement Q&A — analyze plan for improvements, ask targeted
 
 > **Mode: `interactive`.** This is the interactive adapter of the shared Refinement
 > Methodology (`references/refinement-methodology.md`) — live Q&A in main context. The
-> autonomous adapter (auto-select inside a `Workflow`) is `workflow-writing-plans`
+> autonomous adapter (auto-select inside a `Workflow`) is `workflow-commands:workflow-writing-plans`
 > Step 4. The methodology — decision discovery, tiers, per-decision anatomy,
 > recommendation logic — lives in the engine; this file owns only the interactive
 > delivery.

@@ -64,7 +64,7 @@ ruff check --fix src/ tests/
 Address remaining issues one by one:
 1. Mark the current issue as in-progress
 2. Read the relevant code section using the Read tool
-3. Apply the fix following project lint rules in `.claude/rules/lint_rules/` and `pyproject.toml [tool.ruff]`
+3. Apply the fix following the project's `[tool.ruff]` settings in `pyproject.toml`
 4. Verify the fix by re-running `ruff check <file>` on that file
 5. Check off the completed item before moving to the next
 

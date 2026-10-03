@@ -32,7 +32,7 @@ test -f .beads/.verification-done && cat .beads/.verification-done || echo "NO V
   is NOT a valid bypass.
 
 > Fan-out (epic-batch) lane: the equivalent gate is the per-task `ex:qa:<level>`
-> label enforced by `workflow-execute-plans` — this Step 0 is the single-task lane's
+> label enforced by `workflow-commands:workflow-execute-plans` — this Step 0 is the single-task lane's
 > analog.
 
 ## Step 1: Update Workflow Step

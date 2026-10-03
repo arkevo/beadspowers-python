@@ -26,12 +26,12 @@ phrasing: one task → single-task; an epic or a spec → epic-batch.
 |------|---------|---------|
 | **0** | Create a worktree + branch | An isolated workspace |
 | **1** | `superpowers:brainstorming` | A spec / design document |
-| **2** | `/workflow-planning-sequence` | An epic + tasks, classified and ordered into planning waves |
-| **3a** | `/workflow-execute-spikes` *(only if there are `SPIKE-FIRST` tasks)* | Findings files; closing a spike unblocks its `EXEC-GATED` dependents |
-| **3b** | `/workflow-writing-plans` | One approved plan per task (`wp:approved`) |
-| **4** | `/workflow-execution-sequence` | Execution waves + a plan-coverage gate |
-| **5** | `/workflow-execute-plans` | Implemented, QA'd tasks (`ex:done`) |
-| **6** | `/workflow-ship-epic` | One PR for the whole epic (`sh:shipped`) |
+| **2** | `/workflow-commands:workflow-planning-sequence` | An epic + tasks, classified and ordered into planning waves |
+| **3a** | `/workflow-commands:workflow-execute-spikes` *(only if there are `SPIKE-FIRST` tasks)* | Findings files; closing a spike unblocks its `EXEC-GATED` dependents |
+| **3b** | `/workflow-commands:workflow-writing-plans` | One approved plan per task (`wp:approved`) |
+| **4** | `/workflow-commands:workflow-execution-sequence` | Execution waves + a plan-coverage gate |
+| **5** | `/workflow-commands:workflow-execute-plans` | Implemented, QA'd tasks (`ex:done`) |
+| **6** | `/workflow-commands:workflow-ship-epic` | One PR for the whole epic (`sh:shipped`) |
 
 **If tasks are left over after step 5,** go back to the phase those tasks are
 actually in — unplanned tasks re-enter at **3b**, unordered ones at **4**. The
@@ -62,7 +62,7 @@ Python-specific multi-phase verification with three tiers. After execution compl
 
 **Tooling:** ruff (lint/format), mypy (type checking), pytest (tests), python -m build (packaging).
 
-Verification is a **hard gate, not a suggestion**. `beads-ship-task` refuses to
+Verification is a **hard gate, not a suggestion**. `workflow-commands:beads-ship-task` refuses to
 ship until a `python-verification-{level}` skill has run and written
 `.beads/.verification-done`; in the batch lane the equivalent is a per-task
 `ex:qa:<level>` label. Running `pytest` or `ruff` by hand does **not** satisfy
@@ -73,8 +73,8 @@ either — only the named skill does.
 After Superpowers planning completes, Claude analyzes the plan and asks targeted questions — a mix of Critical, Recommended, and Nice-to-Have — to refine the plan before execution. Each question includes options with reasoning and a recommendation. Skip at any stage by typing "skip."
 
 One methodology, two modes: the single-task lane runs it **interactively**
-(`plan-refinement-qa`, live Q&A); the batch lane runs the same engine
-**autonomously** inside `workflow-writing-plans` Step 4, because a detached
+(`workflow-commands:plan-refinement-qa`, live Q&A); the batch lane runs the same engine
+**autonomously** inside `workflow-commands:workflow-writing-plans` Step 4, because a detached
 Workflow cannot pause for input. Shared logic lives in
 `Commands/workflow-commands/references/refinement-methodology.md`.
 
@@ -83,13 +83,13 @@ Workflow cannot pause for input. Shared logic lives in
 The router (`beads-workflow-router.md`) is the authority document — it outranks
 any "next step" handoff a skill suggests at its own end. It enforces:
 
-1. **Start** — `beads-start-task` marks the issue `in_progress`, creates a feature branch
+1. **Start** — `workflow-commands:beads-start-task` marks the issue `in_progress`, creates a feature branch
 2. **Plan** — `superpowers:writing-plans` writes a plan to `docs/plans/`
-3. **Refine** — `plan-refinement-qa` runs Q&A to stress-test the plan
-4. **Summarize** — `plan-summary-console` prints the refined plan in the console
+3. **Refine** — `workflow-commands:plan-refinement-qa` runs Q&A to stress-test the plan
+4. **Summarize** — `workflow-commands:plan-summary-console` prints the refined plan in the console
 5. **Execute** — User chooses sequential (`superpowers:executing-plans`) or parallel (`superpowers:subagent-driven-development`)
-6. **Verify** — `beads-post-execution` auto-invokes, runs the matching verification tier
-7. **Ship** — `beads-ship-task` commits, pushes, opens a PR, closes the beads issue
+6. **Verify** — `workflow-commands:beads-post-execution` auto-invokes, runs the matching verification tier
+7. **Ship** — `workflow-commands:beads-ship-task` commits, pushes, opens a PR, closes the beads issue
 
 Plus these hard stops: no direct coding after task start; `systematic-debugging`
 first on `bug` tasks; verification before any ship or "done"; ready-task lists
@@ -103,28 +103,28 @@ authorization** (with an explicit hard-lock list that isn't).
 | Say This | Invokes |
 |----------|---------|
 | "What's ready?" | `beads:ready` (scoped to active epic) |
-| "I'm starting [task]" | `beads-start-task` |
+| "I'm starting [task]" | `workflow-commands:beads-start-task` |
 | "Plan this" | `superpowers:writing-plans` |
-| "Refine the plan" | `plan-refinement-qa` |
-| "Summarize the plan" | `plan-summary-console` |
+| "Refine the plan" | `workflow-commands:plan-refinement-qa` |
+| "Summarize the plan" | `workflow-commands:plan-summary-console` |
 | "Execute the plan" | Execution gate (sequential vs subagent-driven) |
-| "Ship it" | `beads-ship-task` (always opens a PR) |
-| "Quick verify" | `python-verification-quick` |
-| "Standard verify" | `python-verification-standard` |
-| "Full verify" | `python-verification-full` |
-| "I found a critical bug" | `hotfix-interrupt` |
-| "Export progress" | `beads-export-progress` |
+| "Ship it" | `workflow-commands:beads-ship-task` (always opens a PR) |
+| "Quick verify" | `workflow-commands:python-verification-quick` |
+| "Standard verify" | `workflow-commands:python-verification-standard` |
+| "Full verify" | `workflow-commands:python-verification-full` |
+| "I found a critical bug" | `workflow-commands:hotfix-interrupt` |
+| "Export progress" | `workflow-commands:beads-export-progress` |
 
 **Epic-batch lane** — these need the word *epic* (or a spec) to route here
 
 | Say This | Invokes |
 |----------|---------|
-| "Decompose this spec" / "Sequence the spec" | `workflow-planning-sequence` |
-| "Plan the epic" / "Write all the plans" | `workflow-writing-plans` |
-| "Run the spikes" | `workflow-execute-spikes` |
-| "What order do I ship this epic?" | `workflow-execution-sequence` |
-| "Execute the epic" / "Build the whole epic" | `workflow-execute-plans` |
-| "Ship the epic" | `workflow-ship-epic` |
+| "Decompose this spec" / "Sequence the spec" | `workflow-commands:workflow-planning-sequence` |
+| "Plan the epic" / "Write all the plans" | `workflow-commands:workflow-writing-plans` |
+| "Run the spikes" | `workflow-commands:workflow-execute-spikes` |
+| "What order do I ship this epic?" | `workflow-commands:workflow-execution-sequence` |
+| "Execute the epic" / "Build the whole epic" | `workflow-commands:workflow-execute-plans` |
+| "Ship the epic" | `workflow-commands:workflow-ship-epic` |
 
 When scope is genuinely ambiguous, Claude asks before fanning out — the batch
 lane spends real multi-agent budget and a wrong guess is expensive.
@@ -348,7 +348,7 @@ The verification phases validate against a 5-layer Python architecture:
 
 ### Verification Phases
 
-The P02–P14 phase commands and verification agents are Python-focused, using **ruff** for linting/formatting, **mypy** for type checking, and **pytest** for testing. To adapt for other languages, modify the phase files and agents in `.claude/Commands/workflow-commands/` and `.claude/agents/`, and rename the `python-verification-*` skills — the router and `beads-post-execution` reference them by name.
+The P02–P14 phase commands and verification agents are Python-focused, using **ruff** for linting/formatting, **mypy** for type checking, and **pytest** for testing. To adapt for other languages, modify the phase files and agents in `.claude/Commands/workflow-commands/` and `.claude/agents/`, and rename the `python-verification-*` skills — the router and `workflow-commands:beads-post-execution` reference them by name.
 
 ### Model tiers in the batch lane
 
@@ -361,7 +361,7 @@ never offered to the user as a choice.
 
 ### Adding a design-fidelity gate
 
-`workflow-execute-plans` assumes no visual surface. If your project has a UI
+`workflow-commands:workflow-execute-plans` assumes no visual surface. If your project has a UI
 worth checking against a design source, add a stage label between
 `ex:qa:<level>` and `ex:done` and gate on it the same way the QA level is gated.
 

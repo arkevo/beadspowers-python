@@ -1,5 +1,5 @@
 ---
-description: Print a numbered + bulleted console summary of the refined plan so the user can review it without opening the .md file. Auto-invoked after plan-refinement-qa completes.
+description: Print a numbered + bulleted console summary of the refined plan so the user can review it without opening the .md file. Auto-invoked after workflow-commands:plan-refinement-qa completes.
 ---
 
 # Plan Summary (Console)
@@ -21,7 +21,7 @@ echo "Plan Summary" > .beads/.workflow-step
 
 ## Inputs
 
-- `plan_file` path from session state (the `docs/plans/<YYYY-MM-DD>-<topic>.md` file produced by writing-plans and updated by plan-refinement-qa)
+- `plan_file` path from session state (the `docs/plans/<YYYY-MM-DD>-<topic>.md` file produced by superpowers:writing-plans and updated by workflow-commands:plan-refinement-qa)
 - If `plan_file` is not in session state, ask the user which plan to summarize
 
 ## Output Format (required)
@@ -74,7 +74,7 @@ Refinement Decisions applied: <N> (<X> critical, <Y> recommended, <Z> nice-to-ha
 2. Identify top-level phase / step sections (typically `## Phase N:` or `## Step N:` headings)
 3. Extract the phase goal from the heading
 4. From each phase body, pull the 2–5 most load-bearing sub-items as bullets
-5. Read the `## Refinement Decisions` table (appended by plan-refinement-qa) to build the "Refinement" delta line and tag refined bullets
+5. Read the `## Refinement Decisions` table (appended by workflow-commands:plan-refinement-qa) to build the "Refinement" delta line and tag refined bullets
 
 ## Handoff to Execution Gate
 
@@ -84,7 +84,7 @@ After printing the summary, on a new line print:
 Ready to execute.
 ```
 
-Then immediately present the execution gate prompt (same wording as plan-refinement-qa handoff):
+Then immediately present the execution gate prompt (same wording as the workflow-commands:plan-refinement-qa handoff):
 
 ```
 How would you like to execute this plan?

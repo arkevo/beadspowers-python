@@ -1,5 +1,5 @@
 ---
-description: Execute every approved plan in a beads epic with per-task worktree fan-out, TDD, python-verification QA gates, and batched manual smoke gates (FastAPI service) using segmented Claude Workflows
+description: Execute every approved plan in a beads epic with per-task worktree fan-out, TDD, python-verification QA gates, and batched manual smoke gates using segmented Claude Workflows
 ---
 
 # Workflow: Executing Plans for an Epic (Python)
@@ -14,7 +14,7 @@ workflow router (`.claude/rules/0_Beads x Superpowers/beads-workflow-router.md`)
 and the hard-lock rules (`.claude/rules/critical ai agent rule.md`).
 
 This is the **execution** half of a two-command pair. Its sibling
-`/workflow-writing-plans` produced the plans this command consumes. It requires
+`/workflow-commands:workflow-writing-plans` produced the plans this command consumes. It requires
 the **`wp:approved`** beads label **and** plan-frontmatter `status: approved` on
 **every currently-plannable task in the epic** before it will run —
 **`wp:deferred` tasks are exempt** (they genuinely can't be planned yet; see
@@ -29,7 +29,7 @@ the precondition below).
 > surface worth pixel-checking.
 
 > **Spikes and cross-epic closures.** `SPIKE-FIRST` tasks are **not** executed
-> here — they run through `/workflow-execute-spikes` (a lightweight prototype +
+> here — they run through `/workflow-commands:workflow-execute-spikes` (a lightweight prototype +
 > findings pass) and are already **closed** by the time this command runs. And when
 > an epic's execution closure spans **multiple epics**, this command operates on the
 > `exec:<slug>`-labeled **closure**, not just the named epic's children — see
@@ -69,7 +69,7 @@ file per task on one shared branch.
 | Agent model | **Opus** (`opts.model: "opus"`) |
 | Reasoning effort | **medium** |
 | Git model | **Per-task worktree isolation** for parallel autonomous tasks; merged on green QA + passed gates |
-| Budget shown as | **% of the 5-hr Opus medium usage limit** |
+| Budget shown as | **% of the 5-hr usage limit** |
 
 **Pass the tier alias, never a pinned version.** `opts.model` takes
 `"opus"` / `"sonnet"` / `"haiku"` / `"fable"` — a *tier*, which resolves to
@@ -145,9 +145,9 @@ worth pixel-checking, add a stage label of your own between them.
 
 `$ARGUMENTS` = `<epic-id>`. Resolve **what set of tasks** this run executes — the
 epic alone is **not** always its execution scope (a `blocks` edge can point at a task
-in another epic; see `/workflow-execution-sequence`):
+in another epic; see `/workflow-commands:workflow-execution-sequence`):
 
-- **`exec:<slug>` label present** (applied by `/workflow-execution-sequence` when the
+- **`exec:<slug>` label present** (applied by `/workflow-commands:workflow-execution-sequence` when the
   closure spans epics) → the scope is **every task carrying that label** (the
   transitive `blocks`-closure). Approval (0b), routing, and waves all operate over
   this set.
@@ -156,14 +156,14 @@ in another epic; see `/workflow-execution-sequence`):
   **refuse**:
 
   > 🛑 Epic **<epic-id>** has cross-epic blockers (`<id>` in `<other-epic>`) but no
-  > `exec:<slug>` closure label. Run `/workflow-execution-sequence <epic-id>` first to
+  > `exec:<slug>` closure label. Run `/workflow-commands:workflow-execution-sequence <epic-id>` first to
   > compute + label the closure, then re-run this command.
 
   If none exist (self-contained epic), the scope is the epic's own children — the
   default.
 
 Exclude `closed` tasks from the scope (their edges are already satisfied), mirroring
-`/workflow-execution-sequence` Step 2. Everywhere below, **"the epic's tasks" means
+`/workflow-commands:workflow-execution-sequence` Step 2. Everywhere below, **"the epic's tasks" means
 this resolved scope.**
 
 ### 0b — Approval precondition (HARD GATE, `wp:deferred` exempt)
@@ -171,7 +171,7 @@ this resolved scope.**
 This command requires **scope-level approval** — but only over the portion of
 the resolved scope (Step 0a) that is actually plannable right now. A task
 carrying **`wp:deferred`** (an `EXEC-GATED` task whose upstream hasn't been
-**executed** yet — see `/workflow-writing-plans`) is **excluded from this gate
+**executed** yet — see `/workflow-commands:workflow-writing-plans`) is **excluded from this gate
 entirely**. Its absence isn't incomplete planning; it's the pipeline correctly
 waiting on an earlier wave to execute. Requiring `wp:deferred` tasks to be
 approved up front would make any multi-wave epic permanently unexecutable —
@@ -194,8 +194,8 @@ unapproved:
 > `wp:approved` / `status: approved`:
 > - <task-id> "<Title>" — <missing signal>
 >
-> `/workflow-execute-plans` runs only when every currently-plannable task is
-> approved. Finish planning with `/workflow-writing-plans` first, or pick a
+> `/workflow-commands:workflow-execute-plans` runs only when every currently-plannable task is
+> approved. Finish planning with `/workflow-commands:workflow-writing-plans` first, or pick a
 > different epic.
 
 **Refuse to execute the unapproved (non-deferred) tasks; warn on the rest.**
@@ -362,9 +362,9 @@ an `ex:qa:<level>` label and a QA-ledger line (a bare `ex:qa` means
 > the fan-out lane's embodiment of the router's *Hard Stop: Verification Before
 > Ship / "Done"*. The single-task lane's analog is the `.beads/.verification-done`
 > marker written by the `python-verification-{level}` skill and checked by
-> `beads-ship-task` Step 0. Same rule, two mechanisms: **no path ships without a
+> `workflow-commands:beads-ship-task` Step 0. Same rule, two mechanisms: **no path ships without a
 > named `python-verification-{level}` skill having run** — auto-selected from the
-> real diff here, level-detected by `beads-post-execution` there.
+> real diff here, level-detected by `workflow-commands:beads-post-execution` there.
 
 > **Smoke-gate creation happens here too:** when a task is `smoke_test:
 > required`, create its dedicated **"Smoke gate: <task-id>"** beads issue and wire
@@ -513,22 +513,22 @@ give the user a plain-language status report, not just the QA ledger. Pull
 every task's `ex:*` / `wp:*` label via `beads:show` / `beads:list` and say:
 
 - **Fully executed** — if every task in the resolved scope (Step 0a) is
-  `ex:done`, say so and name the next command: `/workflow-ship-epic <epic-id>`.
+  `ex:done`, say so and name the next command: `/workflow-commands:workflow-ship-epic <epic-id>`.
 - **Blocked bugs** — name every `ex:blocked` task and its filed bug id; these
   need a fix pass before shipping is possible.
 - **Refused at Step 0b** — if the run refused to start because a non-deferred
   task was unapproved, restate which tasks are missing approval and point to
-  `/workflow-writing-plans`.
+  `/workflow-commands:workflow-writing-plans`.
 - **Waiting on an earlier wave** — list every `wp:deferred` task excluded from
   this run (per Step 0b) and name what it's waiting on. This is expected
   behavior, not a failure — present it that way, and note that a fresh
-  `/workflow-writing-plans` run will pick each one up once its upstream
+  `/workflow-commands:workflow-writing-plans` run will pick each one up once its upstream
   executes.
 - **Cross-epic scope** — if this run operated on an `exec:<slug>` closure
   (Step 0a), say so and scope the "fully executed" check to that whole
   closure, not just the named epic.
 
-State the single next command plainly — `/workflow-ship-epic <epic-id>` when
+State the single next command plainly — `/workflow-commands:workflow-ship-epic <epic-id>` when
 fully done, the fix/plan command otherwise — rather than a menu of every
 possibility.
 
@@ -580,7 +580,7 @@ service contract authored in another — exactly the class of bug a per-task qui
 pass cannot see). Therefore: **before closing the epic, if the cumulative epic
 diff is 200+ lines OR touches new modules / shared substrate (your package's
 core modules, service / API / data-access layers, `migrations/`), run ONE
-`python-verification-full` over the aggregate changed set** — even when every
+`workflow-commands:python-verification-full` over the aggregate changed set** — even when every
 individual task was quick/standard. Record it on the ledger's cumulative line.
 
 Use the `beads:label` / `beads:update` / `beads:create` / `beads:dep` skills to
@@ -622,14 +622,14 @@ Do not notify for purely automated transitions (autonomous execute/QA/auto-merge
 
 - **Scope + approval precondition (Steps 0a–0b):** resolve the execution scope first
   — consume the `exec:<slug>` closure label when present; **refuse a bare cross-epic
-  run that has no closure label** (run `/workflow-execution-sequence` first so the
+  run that has no closure label** (run `/workflow-commands:workflow-execution-sequence` first so the
   enablers aren't silently skipped). Then never execute a partial trickle among the
   **plannable** set: require `wp:approved` + `status: approved` on every non-deferred
   task in that scope; refuse the unapproved ones. **`wp:deferred` tasks are exempt**
   from this gate — they can't be planned until an earlier wave executes, and this
   command is what executes it.
 - **Spikes run elsewhere:** `SPIKE-FIRST` tasks are executed by
-  `/workflow-execute-spikes` (lightweight prototype + findings) and are closed before
+  `/workflow-commands:workflow-execute-spikes` (lightweight prototype + findings) and are closed before
   this command runs — never execute a spike through this command.
 - **Hard locks (`.claude/rules/critical ai agent rule.md`):** protected-path
   tasks are **force-attended, never auto-merged** — stop for explicit human
@@ -651,7 +651,7 @@ Do not notify for purely automated transitions (autonomous execute/QA/auto-merge
   undetected without the structured review the skill performs.
 - **Cumulative full-sweep before epic close:** if the epic's aggregate diff is
   200+ lines or touches your package's core modules / service / API /
-  data-access layers / `migrations/`, run ONE `python-verification-full` over the whole
+  data-access layers / `migrations/`, run ONE `workflow-commands:python-verification-full` over the whole
   changed set before closing the epic — it catches cross-task integration
   defects per-task passes miss.
 - **Separate QA-fix commits (Step 3, item 5):** QA auto-fixes commit

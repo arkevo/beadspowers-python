@@ -10,7 +10,7 @@ any **direct TDD** fix — determine verification level and offer options. This 
 mandatory before ship/"done" (see the router's *Hard Stop: Verification Before
 Ship / "Done"*); it is NOT limited to plan-execution. The chosen
 `python-verification-{level}` skill writes the `.beads/.verification-done` marker
-that `beads-ship-task` gates on.
+that `workflow-commands:beads-ship-task` gates on.
 
 ## Step 1: Update Workflow Step
 ```bash

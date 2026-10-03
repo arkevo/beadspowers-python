@@ -6,7 +6,7 @@ description: Author + refine an implementation plan for the tasks in a planning-
 
 Produce and refine an implementation plan for the tasks named in a
 **planning-sequence file** (the artifact emitted by
-`/workflow-planning-sequence`). Per-task work fans out across **Claude
+`/workflow-commands:workflow-planning-sequence`). Per-task work fans out across **Claude
 Workflows** (the `Workflow` tool), but — unlike a flat fan-out — this command
 **obeys the sequence**: it plans wave-by-wave, pipelines `SEQ-PLAN` chains so a
 downstream plan reads the real upstream decision, emits lightweight spike plans
@@ -16,14 +16,14 @@ workflow runs.
 
 This command obeys the beads workflow router
 (`.claude/rules/0_Beads x Superpowers/beads-workflow-router.md`) and saves all
-artifacts under `docs/plans/<epic-slug>/` per the git-workflow rule
+artifacts under `docs/plans/<epic-slug>/` per Rule 1 of the plan-protection rule
 (`.claude/rules/Git Best Practices/protect_plans_and_commit_all.md`). The per-epic subfolder + `<task-id>-<slug>.md`
 naming is an intentional epic-folder organization that still honors the rule's
 intent (plans as permanent files under `docs/plans/`).
 
 This is the **planning** half of the pipeline:
-`/workflow-planning-sequence` (decompose → classify → order → emit sequence
-file) → **this command** (author plans) → `/workflow-execute-plans` (build).
+`/workflow-commands:workflow-planning-sequence` (decompose → classify → order → emit sequence
+file) → **this command** (author plans) → `/workflow-commands:workflow-execute-plans` (build).
 Execution, QA, smoke gates, and worktrees are **out of scope** here.
 
 ---
@@ -54,14 +54,14 @@ conflicts.
 `$ARGUMENTS` = a **sequence-file path** (default: the newest
 `docs/plans/**/*-planning-sequence.md`) **or** an **epic-id** (resolves to that
 epic's sequence file under `docs/plans/<epic-slug>/`; if none exists, stop and
-tell the user to run `/workflow-planning-sequence <epic-id>` first). Accepting an
-epic-id keeps `/workflow-execution-sequence`'s handoff working. **No interactive
+tell the user to run `/workflow-commands:workflow-planning-sequence <epic-id>` first). Accepting an
+epic-id keeps `/workflow-commands:workflow-execution-sequence`'s handoff working. **No interactive
 epic selection** — the conscious input is the sequence file (or the epic-id that
 names it).
 
 **Parse only the structured block.** The sequence file carries a
 machine-readable block (frontmatter YAML or a fenced ```json) produced by
-`/workflow-planning-sequence`, reusing its `TASK_SCHEMA`:
+`/workflow-commands:workflow-planning-sequence`, reusing its `TASK_SCHEMA`:
 
 ```json
 {
@@ -86,7 +86,7 @@ table. The epic id for `wp:*` labels comes from the block's `epic` field; a
 single fallback prompt is allowed only if the file carries no epic id.
 
 **Consume precomputed waves — do not recompute.** The `wave:n` ordering is
-authoritative (computed once by `/workflow-planning-sequence`). This command
+authoritative (computed once by `/workflow-commands:workflow-planning-sequence`). This command
 reads those waves; it does **not** re-run a topological sort. This keeps a
 single planning-toposort implementation and prevents the two commands from
 disagreeing on order.
@@ -95,7 +95,7 @@ disagreeing on order.
 against the epic's beads tasks. Report orphans **both directions** (in-file-not-
 in-epic; in-epic-not-in-file), then proceed with the **intersection**. No silent
 skips, no auto-mutation — if drift is real, the user re-runs
-`/workflow-planning-sequence`.
+`/workflow-commands:workflow-planning-sequence`.
 
 ---
 
@@ -108,7 +108,7 @@ skips, no auto-mutation — if drift is real, the user re-runs
 | Apply agent model (Step 6) | **Sonnet** (`opts.model: "sonnet"`) |
 | Apply reasoning effort (Step 6) | **medium** |
 | Git model | One shared epic branch (separate files per task → non-conflicting); Step 6 additionally uses short-lived per-bucket worktrees + a main-context merge when it splits — see Step 6 |
-| Budget shown as | **% of the 5-hr Opus xhigh usage limit** — Step 6 runs on Sonnet and isn't separately metered against that limit |
+| Budget shown as | **% of the 5-hr usage limit** — Step 6 runs on Sonnet and isn't separately metered against that limit |
 
 **Pass the tier alias, never a pinned version.** `opts.model` takes
 `"opus"` / `"sonnet"` / `"haiku"` / `"fable"` — a *tier*, which resolves to
@@ -256,7 +256,7 @@ written to no separate file).
 |---|---|
 | `PARALLEL` + `PLAN-READY` | Fan out together — this is **wave 1** |
 | `SEQ-PLAN` | **Pipeline**: author after the upstream plan lands; inject the upstream plan's concrete design decisions (schema, interface, types) into this task's drafting + refinement context |
-| `SPIKE-FIRST` | Author a **lightweight spike/prototype plan** (goal, the unknown to resolve, prototype steps, the contract the spike must produce, **and the probe frontmatter — `spike_probe` / `probe_steps` / `needs_human_verdict` — telling `/workflow-execute-spikes` how to exercise it**; the available `spike_probe` values are defined by that repo's executor), **not** a full implementation plan |
+| `SPIKE-FIRST` | Author a **lightweight spike/prototype plan** (goal, the unknown to resolve, prototype steps, the contract the spike must produce, **and the probe frontmatter — `spike_probe` / `probe_steps` / `needs_human_verdict` — telling `/workflow-commands:workflow-execute-spikes` how to exercise it**; the available `spike_probe` values are defined by that repo's executor), **not** a full implementation plan |
 | `EXEC-GATED` | **Do not author.** Defer; label `wp:deferred`; report "blocked until `<upstream>` is *executed*." |
 
 **Conditional-draft skip (per task, per wave):** skip `superpowers:writing-plans`
@@ -271,8 +271,8 @@ beads task is **closed / execution-labeled** (checked via `beads:show`). On a
 re-run, deferred tasks whose upstream is now executed rejoin the pipeline. When
 present, the optional `docs/plans/<epic-slug>/<spike-id>-findings.md` supplies
 the **content** (measured interface/throughput) the now-unblocked downstream plan
-reads. Execution itself happens in `/workflow-execute-spikes` (for the spike that
-produces the findings) and `/workflow-execute-plans` (for real implementation tasks),
+reads. Execution itself happens in `/workflow-commands:workflow-execute-spikes` (for the spike that
+produces the findings) and `/workflow-commands:workflow-execute-plans` (for real implementation tasks),
 never here.
 
 Write each authored plan to `docs/plans/<epic-slug>/<task-id>-<slug>.md` with
@@ -289,7 +289,7 @@ status: draft
 
 > **Spike plans** additionally carry the probe frontmatter from the SPIKE-FIRST row —
 > `spike_probe` / `probe_steps` / `needs_human_verdict` — and set `smoke_test: none`
-> (a spike has no smoke gate; `/workflow-execute-spikes` exercises + observes it
+> (a spike has no smoke gate; `/workflow-commands:workflow-execute-spikes` exercises + observes it
 > instead, and records evidence into the findings file).
 
 **End-of-step labels:** `wp:drafted` (authored) / `wp:skipped` (description
@@ -383,7 +383,7 @@ into that one call, rather than reopening the same region once per decision.
 it** — as a rule of thumb, a plan file over roughly 400 lines. (Step 4's
 autonomous mode always produces exactly 10 decisions — 5 critical + 5
 recommended — regardless of plan size, so decision *count* is not a useful
-split signal; plan *length* is. Below the threshold, one Sonnet-5-medium
+split signal; plan *length* is. Below the threshold, one sonnet / medium
 agent applying all 10 decisions with batched edits is already fast and
 cheap — don't add worktree overhead for a small plan.)
 
@@ -480,11 +480,11 @@ merge, whichever path was used.
 **End-of-step labels (per task):** `wp:applied-r1` → `wp:approved` + plan
 frontmatter `status: approved`.
 
-This is the **plan-ready handoff**: `/workflow-execute-plans` requires both
+This is the **plan-ready handoff**: `/workflow-commands:workflow-execute-plans` requires both
 `wp:approved` and `status: approved` before it will execute a plan. **Deferred
 (`wp:deferred`) tasks are not approved** — they are reported as blocked and
 picked up on a later run once their upstream is executed. If
-`/workflow-execute-plans` is not yet installed, **stop at `wp:approved`** — the
+`/workflow-commands:workflow-execute-plans` is not yet installed, **stop at `wp:approved`** — the
 plannable plans are complete; execution is handed off separately.
 
 ---
@@ -500,17 +500,17 @@ earlier wave) via `beads:show` / `beads:list`, and explain:
   `status: approved`, whether from this run or a prior one.
 - **What's still deferred, and why** — for every `wp:deferred` task, name its
   blocking upstream and say plainly whether that upstream is a spike waiting
-  on `/workflow-execute-spikes`, or a task waiting on `/workflow-execute-plans`
+  on `/workflow-commands:workflow-execute-spikes`, or a task waiting on `/workflow-commands:workflow-execute-plans`
   to actually build it. This is expected pipeline behavior, not an error —
   say so plainly rather than presenting it as a problem.
 - **Whether execution-sequence will matter** — if any approved task has a
   cross-epic `blocks`-predecessor with no `exec:<slug>` label yet, note that
-  `/workflow-execution-sequence` will be needed before `/workflow-execute-plans`
+  `/workflow-commands:workflow-execution-sequence` will be needed before `/workflow-commands:workflow-execute-plans`
   can run on the full closure; otherwise say plainly that this epic is
   self-contained and doesn't need it.
 - **The single next command** — if there's a plannable spike,
-  `/workflow-execute-spikes <epic-id>`; if the currently-approved set is ready
-  to build, `/workflow-execute-plans <epic-id>`; if nothing more can happen
+  `/workflow-commands:workflow-execute-spikes <epic-id>`; if the currently-approved set is ready
+  to build, `/workflow-commands:workflow-execute-plans <epic-id>`; if nothing more can happen
   until an earlier wave executes, say that plainly and name what's blocking it.
 
 Keep this conversational, not a wall of tables — the goal is the same kind of
@@ -547,8 +547,8 @@ intentionally **no separate status/resume command.**
 | `<spike-id>-findings.md` *(optional, external)* | Written during execution of a spike; supplies the measured contract that unblocks `EXEC-GATED` dependents. Read, not written, by this command. |
 
 The sequence file itself (`*-planning-sequence.md`) is produced by
-`/workflow-planning-sequence` and consumed here. Plans are **permanent** under
-`docs/plans/` (git-workflow Rule 2) — never deleted after execution.
+`/workflow-commands:workflow-planning-sequence` and consumed here. Plans are **permanent** under
+`docs/plans/` (`Git Best Practices/protect_plans_and_commit_all.md` Rule 2) — never deleted after execution.
 
 There is intentionally **no `cross-plan-verification.md`** — convergence is
 handled upstream by `SEQ-PLAN` pipelining and the shared-conventions constraints,
@@ -576,9 +576,9 @@ require babysitting the console. Do not notify for purely automated transitions.
 - **Beads via skills**: use `beads:*` skills, never raw `bd` in Bash.
 - **No worktrees here, with one exception**: planning is non-conflicting on
   one shared epic branch. Full execution, QA, and smoke gates still belong to
-  `/workflow-execute-plans`. The one exception is Step 6's optional split-apply
+  `/workflow-commands:workflow-execute-plans`. The one exception is Step 6's optional split-apply
   path, which uses short-lived per-bucket worktrees purely to keep two
-  Sonnet-5-medium agents from racing on the same plan file — those are merged
+  sonnet / medium agents from racing on the same plan file — those are merged
   back into the shared epic branch before the step ends, never left standing.
 - **Obey the sequence**: never flat-fan-out all tasks at once; plan by wave,
   pipeline `SEQ-PLAN`, defer `EXEC-GATED`. The precomputed `wave:n` from the

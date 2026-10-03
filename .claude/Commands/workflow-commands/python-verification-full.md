@@ -442,7 +442,7 @@ errors.
 
 ### Step 1: Invoke Build Validator Skill
 
-Invoke `/P11.5-build-validation` to perform comprehensive build checks:
+Invoke `workflow-commands:P11.5-build-validation-[F]` to perform comprehensive build checks:
 - Build environment validation (Python version, virtual environment, CLI tools)
 - Dependency validation (`pip install -e ".[dev]"`, `pip check`)
 - Static analysis (`ruff check`, `mypy`)
@@ -908,8 +908,8 @@ Found [N] issues. **[1] CRITICAL issue needs immediate attention.**
 - `/superpowers:verification-before-completion` for major changes
 
 **For smaller changes, use:**
-- `/python-verification-quick` (< 50 lines): lint + tests only
-- `/python-verification-standard` (50-200 lines): analysis without agents
+- `/workflow-commands:python-verification-quick` (< 50 lines): lint + tests only
+- `/workflow-commands:python-verification-standard` (50-200 lines): analysis without agents
 
 **Automatic hotfix prompt triggers:**
 
@@ -1311,7 +1311,7 @@ Verification Triggered
 
 Immediately before generating the Phase 13 report — and ONLY if Phase 11's tests
 passed (and no blocking finding remains) — write the marker the router's *Hard
-Stop: Verification Before Ship / "Done"* and `beads-ship-task` gate on:
+Stop: Verification Before Ship / "Done"* and `workflow-commands:beads-ship-task` gate on:
 
 ```bash
 TASK=$(python3 -c "import json;print(json.load(open('.beads/.session-state.json')).get('task_id',''))" 2>/dev/null)

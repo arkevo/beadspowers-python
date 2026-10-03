@@ -10,7 +10,7 @@ ship stumbled over it.
 
 What went wrong, verified from the record rather than inferred:
 
-- `/workflow-ship-epic` was **never invoked**. The epic's label set was empty
+- `/workflow-commands:workflow-ship-epic` was **never invoked**. The epic's label set was empty
   — no `sh:pushed`, no `sh:shipped`. It did not fail partway; it never ran.
 - All child tasks sat at `ex:done` with their QA levels recorded, and the
   visual ones carried `ex:design` with saved parity evidence. **The work was
@@ -27,8 +27,8 @@ What went wrong, verified from the record rather than inferred:
   epic silently integrated two. That had to be caught and surfaced by hand,
   mid-ship.
 
-**The pipeline behaved correctly at every step.** `/workflow-execute-plans`
-ends at `ex:done` and never auto-ships; `/workflow-ship-epic` never auto-runs.
+**The pipeline behaved correctly at every step.** `/workflow-commands:workflow-execute-plans`
+ends at `ex:done` and never auto-ships; `/workflow-commands:workflow-ship-epic` never auto-runs.
 Both are deliberate safety properties and this rule does **not** weaken them.
 The gap is that **nothing notices an epic that stops between them**, and
 nothing objects when the next epic is stacked on top of it.
@@ -37,8 +37,8 @@ nothing objects when the next epic is stacked on top of it.
 
 ### 1. Check for a finished-but-unshipped epic before starting new epic work
 
-At the START of `/workflow-planning-sequence`, `/workflow-writing-plans` and
-`/workflow-execute-plans`, look for any epic whose children are all `ex:done`
+At the START of `/workflow-commands:workflow-planning-sequence`, `/workflow-commands:workflow-writing-plans` and
+`/workflow-commands:workflow-execute-plans`, look for any epic whose children are all `ex:done`
 but which lacks `sh:shipped`. If one exists, surface it before doing anything
 else:
 
@@ -46,7 +46,7 @@ else:
 > shipped — all N children are `ex:done`, the epic has no `sh:shipped`, and
 > its code is not on trunk.
 >
-> Ship it with `/workflow-ship-epic <id>` first, or tell me to proceed and
+> Ship it with `/workflow-commands:workflow-ship-epic <id>` first, or tell me to proceed and
 > stack this new work on top of it.
 
 This is a **surface-and-ask**, not a hard stop. Stacking is sometimes the
@@ -87,8 +87,8 @@ of false signal as a pushed branch.
 
 ### 4. Closing an epic is what ends it — say so at the handoff
 
-When `/workflow-execute-plans` reports an epic fully executed, its
-next-command line (`/workflow-ship-epic <id>`) is the **only** thing standing
+When `/workflow-commands:workflow-execute-plans` reports an epic fully executed, its
+next-command line (`/workflow-commands:workflow-ship-epic <id>`) is the **only** thing standing
 between finished and shipped. State that the epic and its tasks stay OPEN
 until that command runs, so an unshipped epic is never mistaken for a closed
 one.
@@ -96,7 +96,7 @@ one.
 ## Why not just auto-ship?
 
 Because shipping pushes, opens or merges a PR, and closes tickets — all
-outward-facing and hard to reverse. `/workflow-ship-epic`'s EXECUTION LOCK
+outward-facing and hard to reverse. `/workflow-commands:workflow-ship-epic`'s EXECUTION LOCK
 requires explicit invocation plus a confirmation gate, and
 `critical ai agent rule.md` treats trunk integration as a protected
 operation. Those are right. The failure here was not too little automation;
