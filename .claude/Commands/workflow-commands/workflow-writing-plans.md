@@ -74,16 +74,32 @@ machine-readable block (frontmatter YAML or a fenced ```json) produced by
       "plan_readiness": "PLAN-READY | SPIKE-FIRST",
       "track": "B",
       "wave": 1,
+      "plan_depth": "PLAN-FULL | PLAN-LITE | TDD-DIRECT",
+      "depth_reason": "…",
       "deps": [{ "on": "<task-id>", "type": "PARALLEL | SEQ-PLAN | EXEC-GATED", "why": "..." }]
     }
   ]
 }
 ```
 
-Read classification (`plan_readiness`, `deps[].type`, `deps[].on`, `track`,
-`wave`) **from this block only** — never parse the human-readable markdown
-table. The epic id for `wp:*` labels comes from the block's `epic` field; a
-single fallback prompt is allowed only if the file carries no epic id.
+Read classification (`plan_readiness`, `plan_depth`, `deps[].type`, `deps[].on`,
+`track`, `wave`) **from this block only** — never parse the human-readable
+markdown table. The epic id for `wp:*` labels comes from the block's `epic`
+field; a single fallback prompt is allowed only if the file carries no epic id.
+
+**Consume plan depth — do not re-derive it.** `plan_depth` was assigned by
+`/workflow-commands:workflow-planning-sequence` (its Axis 3, the batch mirror of
+the router's *Sizing Gate — Claude picks the lane* section), adversarially
+reviewed by its critic, and possibly **adjusted by the owner** at that command's
+review gate. Re-deciding it here would silently discard the owner's call. If a
+task carries **no** `plan_depth` — an older sequence file that predates the
+depth axis — treat it as **`PLAN-FULL`** and name it once in the Step 2
+preview. Never infer the cheapest option from a missing field.
+
+If drafting a task reveals that its depth is plainly wrong (a "two-file" task
+turns out to touch a migration), **stop that task, label it `wp:deferred`, and
+report it** for re-classification. Do not quietly upgrade it mid-flight: the
+depth is also what the owner budgeted at the preview gate.
 
 **Consume precomputed waves — do not recompute.** The `wave:n` ordering is
 authoritative (computed once by `/workflow-commands:workflow-planning-sequence`). This command
@@ -104,7 +120,7 @@ skips, no auto-mutation — if drift is real, the user re-runs
 | Setting | Value |
 |---------|-------|
 | Draft/Refine agent model (Steps 3-4) | **Opus** (`opts.model: "opus"`) |
-| Draft/Refine reasoning effort (Steps 3-4) | **xhigh** |
+| Draft/Refine reasoning effort (Steps 3-4) | **Per task, by difficulty**: `medium`, `high` or `xhigh` — see "Effort by difficulty" below |
 | Apply agent model (Step 6) | **Sonnet** (`opts.model: "sonnet"`) |
 | Apply reasoning effort (Step 6) | **medium** |
 | Git model | One shared epic branch (separate files per task → non-conflicting); Step 6 additionally uses short-lived per-bucket worktrees + a main-context merge when it splits — see Step 6 |
@@ -125,9 +141,60 @@ budget gate or anywhere else. Never print the model in a preview and never
 ask the user to confirm it. If they ask which model a run used, name the
 tier or read the resolved id back from the run — but do not volunteer it.
 
-Steps 3 and 4 do judgment-heavy work — discovering unknowns, drafting
-original plan content, tiering and reasoning about tradeoffs — and use Opus
-at xhigh effort (`opts.model: "opus"`, `opts.effort: "xhigh"`).
+Steps 3 and 4 do judgment-heavy work: discovering unknowns, drafting original
+plan content, and tiering and reasoning about trade-offs. They use Opus
+(`opts.model: "opus"`), with **effort chosen per task by difficulty**.
+
+### Effort by difficulty (Steps 3 and 4)
+
+Planning does not default every draft and refine agent to xhigh. **Effort
+follows how hard the task is.** Step 6 is unaffected and stays Sonnet at
+medium.
+
+Don't invent a new difficulty rating. It is already recorded in the sequence
+block's `plan_depth`, `plan_readiness` and `depth_reason`, set by
+planning-sequence's depth axis and reviewed by the owner. Read the effort from
+them:
+
+| Task | Draft effort (Step 3) | Refine effort (Step 4) |
+|---|---|---|
+| `TDD-DIRECT` (task card) | `medium` | not refined |
+| `PLAN-LITE` | `high` | not refined |
+| `SPIKE-FIRST` (spike plan, any depth) | `high` | not refined |
+| `PLAN-FULL`, no hard trigger | `high` | `high` |
+| `PLAN-FULL` with any hard trigger | `xhigh` | `xhigh` |
+
+**Hard triggers** are the design-risk subset of the Sizing Gate's Lane C
+criteria. Check them against the task's description and `depth_reason`:
+
+- **Sensitive areas:** it touches auth, security, payments, permissions, or
+  user data.
+- **Data or infra changes:** a schema change, a migration, or anything against
+  production data or infrastructure.
+- **Contracts and dependencies:** a client–server or service contract, a public
+  API, or a new dependency.
+- **Foundation plans:** it is the head of a `SEQ-PLAN` chain, so other tasks'
+  plans are built on its decisions.
+- **Open design:** real design alternatives exist, or the acceptance criteria
+  are ambiguous.
+
+**Ties go to `xhigh`,** the same tie-break toward more planning the Sizing Gate
+uses. A task with no `plan_depth` is already treated as `PLAN-FULL` (see
+"Input" above); with no trigger evident either, give it `xhigh`, since its
+difficulty was never assessed.
+
+How effort flows through the run:
+
+- **Step 1** assigns each task's effort once, from the table.
+- **Step 2's preview** shows the mix, and the owner can raise or lower any task
+  there.
+- **Steps 3 and 4** pass it as `opts.effort`.
+- **Harder than expected:** if drafting shows a task is harder than its effort
+  (a "lite" task turns out to need a migration), handle it like the wrong-depth
+  case in "Input" above: label it `wp:deferred` and report it. Don't silently
+  re-run it at a higher effort.
+
+### Apply step and concurrency
 
 Step 6 is different in kind: every decision it applies already carries a
 fully specified "Recommended / auto-selected" option written out by Step 4 —
@@ -156,12 +223,13 @@ chains), `phase(title)`, `log(msg)`, and `budget`. `SEQ-PLAN` chains map onto
 `pipeline()` so stage N+1 receives stage N's plan decisions:
 
 ```js
-// Illustrative — a SEQ-PLAN chain: plan the parent, then feed its decisions down
+// Illustrative — a SEQ-PLAN chain: plan the parent, then feed its decisions down.
+// t.effort is the per-task effort assigned in Step 1 ("Effort by difficulty").
 pipeline(
   seqChain,
-  (t) => agent(draftPrompt(t), { model: "opus", effort: "xhigh", phase: "draft" }),
+  (t) => agent(draftPrompt(t), { model: "opus", effort: t.effort, phase: "draft" }),
   (parentPlan, t) => agent(draftPrompt(t, { upstream: parentPlan }),
-    { model: "opus", effort: "xhigh", phase: "draft" })
+    { model: "opus", effort: t.effort, phase: "draft" })
 );
 ```
 
@@ -176,11 +244,17 @@ Stage labels advance at the **END** of each step.
 | 0 | Resume check (idempotency) | main ctx | — |
 | 1 | Load sequence file (parse block, resolve epic, reconcile) | main ctx | — |
 | 2 | Preview & budget gate (by wave + deferred set) | main ctx | — |
-| 3 | Sequence-aware draft (conditional) | **workflow** | `wp:drafted` / `wp:skipped` / `wp:deferred` |
-| 4 | Refine + auto-select — Round 1 (upstream decisions injected) | **workflow** | `wp:refined-r1` |
-| 5 | Review #1 | **main ctx** | — |
-| 6 | Apply #1 → approve | **workflow** | `wp:applied-r1` → `wp:approved` + `status: approved` |
+| 3 | Sequence-aware draft (conditional, depth-driven) | **workflow** | `wp:drafted` / `wp:skipped` / `wp:carded` / `wp:deferred` |
+| 4 | Refine + auto-select — Round 1 (upstream decisions injected) — **`PLAN-FULL` only** | **workflow** | `wp:refined-r1` |
+| 5 | Review #1 — **`PLAN-FULL` only** | **main ctx** | — |
+| 6 | Apply #1 → approve (lite plans, task cards and spike plans enter here for the stamp only) | **workflow** | `wp:applied-r1` → `wp:approved` + `status: approved` |
 | 7 | Epic status & next-steps summary | main ctx | — |
+
+Steps 4–5 process only `PLAN-FULL` implementation plans. `PLAN-LITE` plans,
+`TDD-DIRECT` task cards and spike plans (every `SPIKE-FIRST` task, whatever its
+depth) skip them and enter Step 6 for the approval stamp only, reaching the same
+`wp:approved` + `status: approved` terminal state — so nothing downstream has to
+know which depth produced a file.
 
 ---
 
@@ -192,14 +266,25 @@ stage** — skip steps already completed.
 
 - A task at **`wp:approved`** is **skipped** (idempotent) **unless** its source
   description changed since approval **or** the user passed `--force`.
-- A task at **`wp:deferred`** is re-evaluated against its unblock signal (see
-  Step 3) — if its upstream is now executed, it rejoins the pipeline; otherwise
-  it stays deferred.
+- A task at **`wp:deferred`** is re-evaluated: an exec-gated task rejoins the
+  pipeline once its upstream is executed (see Step 3's unblock signal), and a
+  task deferred because its depth was plainly wrong rejoins once its depth has
+  been re-classified (re-run `/workflow-commands:workflow-planning-sequence --epic <epic-id>`,
+  or raise it at this command's Step 2 preview). Otherwise it stays deferred.
 - A crashed/interrupted run resumes from the last label written.
 
 ```bash
-# Per task: wp:drafted|wp:skipped|wp:deferred → wp:refined-r1 → wp:applied-r1 → wp:approved
+# PLAN-FULL:               wp:drafted|wp:skipped → wp:refined-r1 → wp:applied-r1 → wp:approved
+# PLAN-LITE:               wp:drafted|wp:skipped ─────────────────────────────────→ wp:approved
+# TDD-DIRECT (task card):  wp:carded ─────────────────────────────────────────────→ wp:approved
+# SPIKE-FIRST (any depth): wp:drafted ────────────────────────────────────────────→ wp:approved
+# Deferred (any depth):    wp:deferred → (unblocked) → re-enters Step 3 on its route above
 ```
+
+A resumed task takes its route from its **current** `plan_depth`, not from the
+one in force when it was drafted. So if the owner raised a task from
+`PLAN-LITE` to `PLAN-FULL` and re-ran, a task sitting at `wp:drafted` now
+correctly flows into Step 4 instead of jumping to the approval stamp.
 
 ---
 
@@ -211,6 +296,9 @@ stage** — skip steps already completed.
    orphans both directions; continue with the intersection.
 4. Group the plannable tasks by their precomputed `wave:n`, and split out the
    **deferred set** (`EXEC-GATED` tasks whose upstream is not yet executed).
+5. **Assign each plannable task its effort** (`medium` / `high` / `xhigh`) from
+   "Effort by difficulty". For `xhigh`, note which hard trigger applied so the
+   Step 2 preview can name it.
 
 Do not author anything in this step — it only loads and validates.
 
@@ -232,7 +320,13 @@ Spikes (lightweight plan now):          S
 Deferred (exec-gated, blocked):         K   ← planned on a later run, after upstream executes
 Resuming: R from prior stages · skipping J already approved
 
-Agents: ≈(N+M+S) (about one per plannable task, capped at min(16, cores−2))
+Plan depth: F full (refined) · L lite (no refinement) · T tdd-direct (task card only)
+            <named, if any: tasks defaulted to PLAN-FULL for want of a plan_depth field>
+Effort:     A medium · B high · C xhigh
+            <named: each xhigh task with its hard trigger, e.g. "<task-id>: migration">
+
+Agents: ≈(N+M+S) + F (one per plannable task, plus one refinement agent per
+        PLAN-FULL plan; capped at min(16, cores−2))
 Estimated cost: ~X–Y% of the 5-hr usage limit
 
 Artifacts: docs/plans/<epic-slug>/
@@ -245,11 +339,25 @@ Branches:  Step 6 may split a long plan across two worktree agents. This
 Proceed? (yes / adjust scope / cancel)
 ```
 
+The depth line is what makes the estimate legible: it is the difference between
+"30 plans and 30 refinement rounds" and "6 plans, 9 short plans, 15 task cards".
+It counts implementation tasks only; spike plans are counted on the Spikes line
+and are never refined. If the owner wants a task planned deeper (or shallower)
+than assigned, they say so here and it is honoured for this run — the same
+override the planning-sequence review gate offers, available once more before
+any spend. The effort line works the same way: the owner can move any task
+between `medium`, `high` and `xhigh` here, and that choice wins over the
+difficulty table for this run.
+
+Show the **Branches** line only when the run includes at least one `PLAN-FULL`
+plan. Only those reach Step 6's apply agents, so a run of lite plans, task cards
+and spike plans creates no branch, and the line is left out.
+
 Do not start the Step 3 workflow until the user confirms.
 
 ---
 
-## Step 3: Sequence-Aware Draft (conditional) [workflow]
+## Step 3: Sequence-Aware Draft (conditional, depth-driven) [workflow]
 
 Drive the fan-out **by class**, using the parsed block. Derive **shared
 conventions** (naming, error-handling approach, migration numbering) once from
@@ -264,21 +372,78 @@ written to no separate file).
 | `SPIKE-FIRST` | Author a **lightweight spike/prototype plan** (goal, the unknown to resolve, prototype steps, the contract the spike must produce, **and the probe frontmatter — `spike_probe` / `probe_steps` / `needs_human_verdict` — telling `/workflow-commands:workflow-execute-spikes` how to exercise it**; the available `spike_probe` values are defined by that repo's executor), **not** a full implementation plan |
 | `EXEC-GATED` | **Do not author.** Defer; label `wp:deferred`; report "blocked until `<upstream>` is *executed*." |
 
-**Conditional-draft skip (per task, per wave):** skip `superpowers:writing-plans`
-only if the task description clears BOTH gates — (1) structural floor (scope,
-approach/steps, files touched, testing strategy, edge cases present) and (2) the
-agent judges it genuinely sufficient for a future executor. **Borderline → write
-the plan.** Skipped → the task description becomes the plan file content; drafted
-→ always author via `superpowers:writing-plans`.
+**Then apply plan depth — it decides how much gets authored.** The class table
+above says *when* a task is authored and against what context; `plan_depth`
+says *how deep*. Both apply, except that `SPIKE-FIRST` overrides depth
+entirely: a spike always gets its lightweight spike plan, and a spike plan is
+never refined.
+
+| `plan_depth` | Author | Refinement (Steps 4–5) |
+|---|---|---|
+| `PLAN-FULL` | A full plan via `superpowers:writing-plans`. | **Yes** — Round 1 as normal. |
+| `PLAN-LITE` | A **short** plan via `superpowers:writing-plans`: the goal, the ordered steps, the files touched, the testing strategy and the risks. No alternatives analysis and no decision log — the approach is already settled. | **No.** Straight to the Step 6 approval stamp. |
+| `TDD-DIRECT` | **No plan.** A minimal **task card** (below). | **No.** Straight to the Step 6 approval stamp. |
+
+**The `TDD-DIRECT` task card.** It is written to the normal path
+`docs/plans/<epic-slug>/<task-id>-<slug>.md` with the normal frontmatter plus
+`plan_depth: tdd-direct`, so every downstream gate keeps working:
+`/workflow-commands:workflow-execute-plans` requires a file with
+`status: approved` and must not need a special case to find it. The card
+carries only four things — the behaviour change, the acceptance criteria, the
+files expected to change, and the **first failing pytest test** to write:
+
+````markdown
+---
+smoke_test: required | none
+smoke_steps: "..."   # "" when none
+bead_id: <task-id>
+plan_depth: tdd-direct
+status: draft
+---
+
+# <task-id> — <Title> (task card)
+
+**Behaviour change:** <one line: what is different once this lands>
+
+**Acceptance criteria:**
+- <an observable condition a reviewer can check>
+- <another one, if there is one>
+
+**Files expected to change:** `src/<your_package>/<module>.py`,
+`tests/<path>/test_<module>.py`
+
+**First failing test:** `tests/<path>/test_<module>.py::test_<behaviour>`
+
+```python
+def test_<behaviour>():
+    # Arrange the input that shows the change, call the code, and assert the
+    # new behaviour. It must fail before the change, for the stated reason.
+    ...
+```
+````
+
+The card is deliberately not a plan. `/workflow-commands:workflow-execute-plans`
+executes it test-first with `superpowers:test-driven-development` — write the
+named failing test, watch it fail, implement, stop — and never rebuilds a plan
+from it.
+
+**Conditional-draft skip (per task, per wave) — `PLAN-FULL` and `PLAN-LITE`
+only.** Skip authoring only if the task description clears BOTH gates — (1) a
+structural floor (scope, approach/steps, files touched, testing strategy, edge
+cases present) and (2) the agent judges it genuinely sufficient for a future
+executor. **Borderline → write the plan.** Skipped → the task description
+becomes the plan file content. `TDD-DIRECT` never routes through this gate: it
+already has its own, smaller artifact.
 
 **EXEC-GATED unblock signal.** An `EXEC-GATED` task unblocks when its upstream
 beads task is **closed / execution-labeled** (checked via `beads:show`). On a
 re-run, deferred tasks whose upstream is now executed rejoin the pipeline. When
 present, the optional `docs/plans/<epic-slug>/<spike-id>-findings.md` supplies
-the **content** (measured interface/throughput) the now-unblocked downstream plan
-reads. Execution itself happens in `/workflow-commands:workflow-execute-spikes` (for the spike that
-produces the findings) and `/workflow-commands:workflow-execute-plans` (for real implementation tasks),
-never here.
+the **content** (measured interface/throughput) the now-unblocked downstream
+plan reads. Execution itself happens in
+`/workflow-commands:workflow-execute-spikes` (for the spike that produces the
+findings) and `/workflow-commands:workflow-execute-plans` (for real
+implementation tasks), never here.
 
 Write each authored plan to `docs/plans/<epic-slug>/<task-id>-<slug>.md` with
 frontmatter:
@@ -288,6 +453,7 @@ frontmatter:
 smoke_test: required | none
 smoke_steps: "..."   # human steps to smoke the change; "" when none
 bead_id: <task-id>
+plan_depth: full | lite | tdd-direct   # from the sequence block; spike plans omit it
 status: draft
 ---
 ```
@@ -297,20 +463,39 @@ status: draft
 > (a spike has no smoke gate; `/workflow-commands:workflow-execute-spikes` exercises + observes it
 > instead, and records evidence into the findings file).
 
-**End-of-step labels:** `wp:drafted` (authored) / `wp:skipped` (description
-sufficient) / `wp:deferred` (exec-gated, upstream not yet executed).
+**End-of-step labels:** `wp:drafted` (a full, lite or spike plan authored) /
+`wp:skipped` (description sufficient) / `wp:carded` (`TDD-DIRECT` task card
+written) / `wp:deferred` (exec-gated with its upstream not yet executed, or a
+depth found plainly wrong while drafting).
+
+**Routing after this step.** `wp:drafted` / `wp:skipped` tasks whose depth is
+`PLAN-FULL` (and that are not spikes) continue into Step 4. `PLAN-LITE` plans,
+`TDD-DIRECT` task cards and spike plans **bypass Steps 4–5** and go straight to
+Step 6 for the approval stamp — there is no refinement round to review, which is
+the entire point of their depth. They still get `wp:approved` +
+`status: approved` like everything else, so the execution gate is unchanged.
 
 ---
 
 ## Step 4: Refine + Auto-Select — Round 1 [workflow]
 
+**Scope: `PLAN-FULL` implementation plans only.** `PLAN-LITE` plans,
+`TDD-DIRECT` task cards and spike plans do not enter this step or Step 5 —
+skipping the refinement round is what their depth buys, and a spike plan is a
+throwaway prototype plan with nothing to refine. If that leaves nothing to
+refine, say so plainly and go to Step 6 rather than spinning up an empty
+fan-out.
+
 Apply the shared Refinement Methodology (`references/refinement-methodology.md`) in
-**`autonomous` mode**: fan out ~**one agent per drafted plan** (deferred tasks
-excluded), passing the engine's content into each agent's context. Per §Mode Contract,
-autonomous mode uses a **fixed quota — 5 critical + 5 recommended** decisions per plan
-and **auto-selects the recommended option** (§Recommendation Logic), because a detached
-`Workflow` cannot pause for input. Constrain each agent by the **shared conventions**
-(Step 3) and — for `SEQ-PLAN` tasks — by the **upstream plan's decisions**.
+**`autonomous` mode**: fan out ~**one agent per drafted `PLAN-FULL` plan**
+(deferred tasks excluded), passing the engine's content into each agent's context.
+Each refine agent runs at **its task's assigned effort** (`high`, or `xhigh` for a
+hard-trigger task, per "Effort by difficulty"), not a blanket xhigh. Per §Mode
+Contract, autonomous mode uses a **fixed quota — 5 critical + 5 recommended**
+decisions per plan and **auto-selects the recommended option** (§Recommendation
+Logic), because a detached `Workflow` cannot pause for input. Constrain each
+agent by the **shared conventions** (Step 3) and — for `SEQ-PLAN` tasks — by the
+**upstream plan's decisions**.
 
 Discover, tier, and analyze each decision **per the engine** (§Decision Discovery,
 §Tier Taxonomy, §Per-Decision Anatomy) — do not restate the methodology here.
@@ -362,8 +547,16 @@ two channels are merged before Step 6.
 ## Step 6: Apply #1 → Approve [workflow]
 
 Fan out per plan. Apply the (possibly user-overridden) Round 1 decisions from
-`refinements.md` into each `<task-id>-<slug>.md` plan file, then stamp each:
-set frontmatter `status: approved`.
+`refinements.md` into each `PLAN-FULL` `<task-id>-<slug>.md` plan file, then
+stamp each: set frontmatter `status: approved`.
+
+**`PLAN-LITE` plans, `TDD-DIRECT` task cards and spike plans enter here** with
+no decisions to apply — they were never refined. For them this step is only the
+stamp: set `status: approved` and label `wp:approved`, leaving the short plan,
+task card or spike plan exactly as drafted. They reach the identical terminal
+state, so `/workflow-commands:workflow-execute-plans`'s gate (`wp:approved` +
+`status: approved`) and `/workflow-commands:workflow-execute-spikes`'s selection
+need no special case for them.
 
 **Model: Sonnet at medium effort** (`opts.model: "sonnet"`,
 `opts.effort: "medium"`) — not Opus/xhigh. Every decision here already
@@ -538,18 +731,27 @@ walkthrough a human would want after checking an epic's status mid-pipeline.
 Per-task stage labels, advancing at the **end** of each step:
 
 ```
-wp:drafted | wp:skipped | wp:deferred          (wp:deferred = exec-gated, upstream not executed)
-      → wp:refined-r1
-      → wp:applied-r1
-      → wp:approved                            (+ plan frontmatter status: approved)
+wp:drafted | wp:skipped | wp:carded | wp:deferred
+      → wp:refined-r1          (PLAN-FULL plans only)
+      → wp:applied-r1          (PLAN-FULL plans only)
+      → wp:approved            (+ plan frontmatter status: approved — every route ends here)
 ```
 
-A `wp:deferred` task stays out of the refine/apply flow until a re-run finds its
-upstream executed; then it re-enters at `wp:drafted`. Use the `beads:label` /
-`beads:update` skills to read and advance labels — never raw `bd` in Bash (per
-`.claude/rules/0_Beads x Superpowers/skill-usage.md`). These labels are the checkpoint + idempotency
-mechanism (Step 0): crashed runs resume, re-runs are incremental, and there is
-intentionally **no separate status/resume command.**
+`wp:carded` marks a `TDD-DIRECT` task card. `PLAN-LITE` plans, task cards and
+spike plans go from their Step 3 label straight to `wp:approved`. `wp:deferred`
+marks an exec-gated task whose upstream has not executed yet, or a task whose
+depth was found plainly wrong while drafting. A deferred task stays out of the
+refine/apply flow until a re-run finds it unblocked; it then re-enters Step 3
+and takes the label its **current** depth produces — `wp:drafted` or
+`wp:skipped` for a full or lite plan, `wp:carded` for a task card. Labels are
+append-only history: the re-entering task keeps `wp:deferred`, and its furthest
+stage wins (the router's *Label Ladders — Append-Only, Furthest Wins* section).
+
+Use the `beads:label` / `beads:update` skills to read and advance labels — never
+raw `bd` in Bash (per `.claude/rules/0_Beads x Superpowers/skill-usage.md`).
+These labels are the checkpoint + idempotency mechanism (Step 0): crashed runs
+resume, re-runs are incremental, and there is intentionally **no separate
+status/resume command.**
 
 ---
 
@@ -557,7 +759,7 @@ intentionally **no separate status/resume command.**
 
 | File | Contents |
 |------|----------|
-| `<task-id>-<slug>.md` | One plan per task. Frontmatter: `smoke_test: required\|none`, `smoke_steps: "..."`, `bead_id: <id>`, `status: draft\|approved` |
+| `<task-id>-<slug>.md` | One file per task: a full plan, a short (lite) plan, a `TDD-DIRECT` task card, or a spike plan. Frontmatter: `smoke_test: required\|none`, `smoke_steps: "..."`, `bead_id: <id>`, `plan_depth: full\|lite\|tdd-direct` (spike plans omit it and carry `spike_probe` / `probe_steps` / `needs_human_verdict` instead), `status: draft\|approved` |
 | `refinements.md` | Full Round-1 refinement analysis + auto-selected decisions. Verbatim options, pros/cons, reasoning, recommendation, auto-selection, confidence per decision. |
 | `<spike-id>-findings.md` *(optional, external)* | Written during execution of a spike; supplies the measured contract that unblocks `EXEC-GATED` dependents. Read, not written, by this command. |
 
@@ -586,8 +788,9 @@ require babysitting the console. Do not notify for purely automated transitions.
   labels. Scope all task listing to that epic.
 - **Plans location** (`.claude/rules/Git Best Practices/protect_plans_and_commit_all.md`): every artifact lives
   under `docs/plans/<epic-slug>/`. Plans are permanent.
-- **Writing plans**: when authoring in Step 3, **always** use
-  `superpowers:writing-plans` — never hand-roll plan prose.
+- **Writing plans**: when authoring a full or lite plan in Step 3, **always**
+  use `superpowers:writing-plans` — never hand-roll plan prose. A `TDD-DIRECT`
+  task card is not a plan; it follows the card format in Step 3.
 - **Beads via skills**: use `beads:*` skills, never raw `bd` in Bash.
 - **No worktrees here, with one exception**: planning is non-conflicting on
   one shared epic branch. Full execution, QA, and smoke gates still belong to
@@ -600,6 +803,13 @@ require babysitting the console. Do not notify for purely automated transitions.
   sequence file is authoritative — do not recompute it.
 - **Budget gate first**: never start the Step 3 workflow before the Step 2
   confirmation.
+- **Draft/refine effort by difficulty**: Opus at each task's assigned effort —
+  `medium` for task cards, `high` for lite and spike plans, and `high` for full
+  plans, rising to `xhigh` with a hard trigger; ties go to `xhigh`. Never a
+  blanket xhigh. Step 6 apply stays Sonnet at medium.
+- **Depth is read, never re-derived**: `plan_depth` comes from the sequence
+  block; a missing depth means `PLAN-FULL`, and a plainly wrong one is deferred
+  and reported, never silently upgraded.
 - **Step 6 cost control**: Sonnet at medium effort, batched edits (plan all
   changes before editing, one Edit call per section not per decision), and
   split across worktree-isolated agents above ~400 plan lines, merged back in

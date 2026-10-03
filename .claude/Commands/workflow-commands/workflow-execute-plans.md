@@ -184,6 +184,13 @@ NOT `wp:deferred`** has BOTH:
 1. the beads label **`wp:approved`**, and
 2. plan frontmatter **`status: approved`** in its `docs/plans/<epic-slug>/<task-id>-<slug>.md`.
 
+A **task card** — the short file `/workflow-commands:workflow-writing-plans`
+writes instead of a plan for a `TDD-DIRECT` task, marked `plan_depth: tdd-direct`
+and labelled `wp:carded` — reaches this same state (`wp:approved` +
+`status: approved`) and needs no special case here. A task carrying both
+`wp:carded` and `wp:approved` is approved: labels are history, and the furthest
+one wins.
+
 It will still **NOT execute a partial trickle among the plannable set** — a
 task that is genuinely mid-planning (drafted but not yet approved, and **not**
 `wp:deferred`) still blocks the whole run, since planning could still change
@@ -304,6 +311,18 @@ order:
    execution (`superpowers:executing-plans` /
    `superpowers:subagent-driven-development`) to work the plan file.
    *(End label: `ex:executing`.)*
+
+   > **A task card is not a plan.** When the plan file's frontmatter carries
+   > `plan_depth: tdd-direct` (the task is labelled `wp:carded`),
+   > `/workflow-commands:workflow-writing-plans` wrote a task card for a task the
+   > Sizing Gate put in Lane A. There are no plan steps to work through: write
+   > the failing pytest test the card names, run it and watch it fail for the
+   > reason the card expects, implement until it passes, and stop. Never rebuild
+   > a plan from the card — its brevity is the decision, not a gap to fill.
+   > Everything after this item (the diff-based QA level, the named verification
+   > skill, the labels and the QA ledger) is unchanged, and the same applies to
+   > an attended task in Step 4.
+
 2. **Analyze the actual diff → choose QA level** (NOT the plan's estimate).
    Compute the real diff and **record it** — this number is a required output,
    not an internal judgement:

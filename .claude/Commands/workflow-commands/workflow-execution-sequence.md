@@ -51,7 +51,7 @@ Two derived facts matter:
 | Setting | Value |
 |---------|-------|
 | This command's own work | Cheap: read-only graph analysis (one `bd export` + a local topo-sort). No agents. |
-| The planning it triggers | `/workflow-commands:workflow-writing-plans` per gap-epic — **Opus / xhigh**, ~one agent per task. Gated (Step 5). |
+| The planning it triggers | `/workflow-commands:workflow-writing-plans` per gap-epic — **Opus**, effort chosen per task by difficulty (`medium` task cards, `high` lite and spike plans, `high` or `xhigh` full plans), ~one agent per task plus one refinement agent per full plan. Gated (Step 5). |
 | Git | No code changes; writes one analysis doc under `docs/plans/` and (via the planning sub-command) plan files. |
 
 ---
@@ -150,9 +150,10 @@ Print:
 
 Then **save the analysis** to `docs/plans/<date>-<epic-slug>-execution-sequence.md`.
 
-Because the next step launches **expensive Opus planning workflows**,
-show a budget/scope preview and require explicit confirmation (mirror
-`/workflow-commands:workflow-writing-plans` Step 2):
+Because the next step launches **expensive Opus planning workflows** (effort
+scaled per task by difficulty, up to xhigh), show a budget/scope preview and
+require explicit confirmation (mirror `/workflow-commands:workflow-writing-plans`
+Step 2):
 
 ```
 📋 Execution sequence for **<epic-id> "<Title>"**

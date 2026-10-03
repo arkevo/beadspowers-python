@@ -1,5 +1,5 @@
 ---
-description: Compute a planning sequence from EITHER a design spec OR an existing beads epic — classifying each task by plan-readiness (plan-ready vs spike-first) and dependency type (parallel / sequential-plan / execution-gated), then emitting a planning-sequence file (machine block + human table) and writing the dependencies/labels. Precursor to /workflow-commands:workflow-writing-plans, which consumes the emitted file.
+description: Compute a planning sequence from EITHER a design spec OR an existing beads epic — classifying each task by plan-readiness (plan-ready vs spike-first), dependency type (parallel / sequential-plan / execution-gated) and plan depth (full plan / lite plan / TDD-direct task card), then emitting a planning-sequence file (machine block + human table) and writing the dependencies/labels. Precursor to /workflow-commands:workflow-writing-plans, which consumes the emitted file.
 ---
 
 # Workflow: Planning Sequence
@@ -40,8 +40,8 @@ Spec-mode default when no argument at all: most recent `docs/plans/*.md`.
 
 ## Core Principle — Plan-Strategy ≠ Build-Order
 
-A naive epic is a flat, dependency-ordered list. That hides two things that matter for
-*planning effort*:
+A naive epic is a flat, dependency-ordered list. That hides three things that
+matter for *planning effort*:
 
 1. **Some tasks cannot be planned yet** — their interface/feasibility/throughput is
    unknown, so a plan would be fiction. These need a **spike** (prototype) first.
@@ -49,13 +49,17 @@ A naive epic is a flat, dependency-ordered list. That hides two things that matt
    *design decision* (available once the upstream is **planned**) or on its *actual
    behavior/interface* (available only once the upstream is **executed**). Conflating
    these serializes work that could pipeline, and pipelines work that must not.
+3. **Tasks need different amounts of plan.** A one-file fix and a schema migration
+   in the same epic should not attract the same authoring and refinement spend.
 
-This command classifies every task on **two axes** and derives **planning waves** from
-them, so you plan only what is plannable and you spike unknowns before building on them.
+This command classifies every task on **three axes** — plan readiness, dependency
+type and plan depth — and derives **planning waves** from the first two, so you
+plan only what is plannable, spike unknowns before building on them, and spend
+planning effort in proportion to each task's risk.
 
 ---
 
-## The Two Classification Axes
+## The Three Classification Axes
 
 ### Axis 1 — Plan readiness
 
@@ -75,11 +79,36 @@ them, so you plan only what is plannable and you spike unknowns before building 
 > **Heuristic for EXEC-GATED:** "If I tried to write this task's plan today, would I be
 > inventing the upstream's interface or numbers?" If yes → EXEC-GATED on that upstream.
 
+### Axis 3 — Plan depth (the Sizing Gate)
+
+**How much plan this task actually needs.** This is the batch mirror of the
+single-task Sizing Gate (the router's *Sizing Gate — Claude picks the lane*
+section in `.claude/rules/0_Beads x Superpowers/beads-workflow-router.md`); the
+values map `PLAN-FULL` → Lane C, `PLAN-LITE` → Lane B and `TDD-DIRECT` → Lane A.
+It exists so that a one-file bug in a 30-task epic does not attract the same
+authoring and refinement spend as a schema migration.
+
+| Value | Meaning | Assign when |
+|---|---|---|
+| `PLAN-FULL` | A full plan, then a refinement round. | **Any** of: it touches auth, security, payments, permissions or user data; a schema, a migration, or anything against production data or infrastructure; a client–server or service contract, a public API, or a new dependency; real alternatives the owner should choose between; more than about 3 files or 150 lines; the acceptance criteria are ambiguous or the description is thin. |
+| `PLAN-LITE` | A short plan — goal, steps, files, tests, risks. **No refinement round.** | Multi-step or multi-file work whose approach is settled, with no alternatives worth debating. The plan is a record and a checklist, not a decision. |
+| `TDD-DIRECT` | No plan. A minimal task card, executed test-first. | **All** of: the cause or shape is already known (you can point at the files and state the behaviour change); roughly 2–3 production files and about 50 lines; no schema or migration, public API or contract change, new dependency, or cloud/infra step; no real alternatives; existing tests cover the area, so a failing pytest test can be written first; reversible. |
+
+> **Ties go to `PLAN-FULL`.** Under-planning a big task costs far more than
+> over-planning a small one. `SPIKE-FIRST` (Axis 1) always overrides this axis —
+> a spike gets its lightweight spike plan regardless of depth, and is never
+> refined.
+
+> **Depth is independent of the other two axes.** It changes only how much is
+> written for a task, never *when* it is written: a `TDD-DIRECT` task with a
+> `SEQ-PLAN` edge still waits for its upstream, and depth never moves a task
+> between waves.
+
 ---
 
 ## Derived Outputs
 
-From the two axes, compute:
+From Axes 1 and 2, compute (plan depth changes none of these):
 
 - **Planning tracks** — weakly-connected chains that can progress independently
   (e.g. a capture track, a data/algorithms track, an independent track).
@@ -96,7 +125,7 @@ From the two axes, compute:
 | Setting | Value |
 |---------|-------|
 | Agent model | **Opus** (`opts.model: "opus"` — a tier alias, never a pinned version) |
-| Reasoning effort | **xhigh** for the classifier/synthesis agents |
+| Reasoning effort | **medium** for the classifier, synthesis and critic agents |
 | Git | No code changes; this command reads the spec/epic, writes beads issues + labels/deps, and emits the planning-sequence file under `docs/plans/` |
 
 ---
@@ -121,7 +150,7 @@ Everything downstream (classify → synthesize → present) is identical for bot
 modes; only task **creation** (Step 5) differs.
 
 ### 2. [workflow] Classify every candidate task
-Fan out **one agent per candidate task** (`Workflow` tool, Opus, effort `xhigh`).
+Fan out **one agent per candidate task** (`Workflow` tool, Opus, effort `medium`).
 Each agent reads the spec (and the referenced source, if a Source Reference Map exists)
 and returns the task's classification against `TASK_SCHEMA` below. Pass all tasks at once;
 concurrency is capped at `min(16, cores−2)`.
@@ -137,6 +166,8 @@ concurrency is capped at `min(16, cores−2)`.
     "title": {"type": "string"},
     "plan_readiness": {"type": "string", "enum": ["PLAN-READY", "SPIKE-FIRST"]},
     "spike_reason": {"type": "string"},
+    "plan_depth": {"type": "string", "enum": ["PLAN-FULL", "PLAN-LITE", "TDD-DIRECT"]},
+    "depth_reason": {"type": "string"},
     "deps": {"type": "array", "items": {"type": "object", "additionalProperties": false,
       "properties": {
         "on": {"type": "string"},
@@ -146,16 +177,32 @@ concurrency is capped at `min(16, cores−2)`.
     "source_ref": {"type": "string"},
     "rationale": {"type": "string"}
   },
-  "required": ["id_slug", "title", "plan_readiness", "deps", "rationale"]
+  "required": ["id_slug", "title", "plan_readiness", "plan_depth", "depth_reason", "deps", "rationale"]
 }
 ```
 
+`plan_depth` is **required**: a classifier that cannot justify a depth has not
+understood the task, and a missing value must not silently become the cheapest
+option. `depth_reason` is one sentence naming the specific Axis 3 trigger —
+"touches the session schema", "two files, no contract change" — never a bare
+restatement of the value.
+
 ### 3. [workflow] Synthesize tracks + waves (+ adversarial check)
-One synthesis agent (Opus, `xhigh`) takes all task classifications and returns:
+One synthesis agent (Opus, `medium`) takes all task classifications and returns:
 tracks, planning waves, spike gates, and a cycle/consistency check. Then **one critic
-agent** adversarially reviews: *is any `PLAN-READY` actually a hidden spike? Is any
-`SEQ-PLAN` really `EXEC-GATED` (would planning it invent the parent's interface)? Any
-dependency cycle? Any task that could move earlier/parallel?* Apply the critic's fixes.
+agent** (Opus, `medium`) adversarially reviews: *is any `PLAN-READY` actually a hidden
+spike? Is any `SEQ-PLAN` really `EXEC-GATED` (would planning it invent the parent's
+interface)? Any dependency cycle? Any task that could move earlier/parallel?* Apply
+the critic's fixes.
+
+The critic also attacks **plan depth in one direction only — upward.** For every
+`TDD-DIRECT` and `PLAN-LITE` task it asks: *does it in fact touch auth, a schema, a
+contract, a new dependency, or production data? Are there alternatives the owner
+should be choosing between? Is the file/line estimate believable, or is it the
+optimism of someone who has not opened the files?* Anything that survives with
+doubt is **promoted**, never demoted. The critic must not downgrade a `PLAN-FULL`
+to save effort — that trade is the owner's to make at the Step 4 gate, where they
+can see it.
 
 `EPIC_SCHEMA`:
 ```json
@@ -177,13 +224,20 @@ dependency cycle? Any task that could move earlier/parallel?* Apply the critic's
 
 ### 4. [main ctx] Present recommendation + review gate
 Print, in console:
-- The **task table** (title · plan-readiness · dependency type · depends-on · source ref).
+- The **task table** (title · plan-readiness · **plan depth** · dependency type ·
+  depends-on · source ref).
+- A one-line **depth summary** — "n full · n lite · n TDD-direct" — plus the
+  `depth_reason` for every `TDD-DIRECT` task, spelled out. Those are the ones the
+  owner is most likely to want promoted, so they must not be buried in a table
+  cell.
 - The **tracks** and the **planning-wave order**, with spike gates called out as
   "🔬 plan + execute before its dependents are planned".
 - Any **notes / open questions** the classification surfaced.
 
-Ask the user to approve, adjust task granularity, or re-classify specific tasks. Iterate
-until approved. **Do not create beads issues before approval.**
+Ask the user to approve, adjust task granularity, **re-assign plan depth**, or
+re-classify specific tasks. Iterate until approved. **Do not create beads issues
+before approval.** Depth is a recommendation until this gate passes — the owner
+raises or lowers any task here, and their call stands over the classifier's.
 
 ### 5. [main ctx] Persist to beads (mode-dependent, beads plugin skills)
 On approval:
@@ -195,9 +249,16 @@ On approval:
   create, split, or merge anything.** Operate on the existing `bead_id`s.
 
 Then, **in both modes**, write the classification onto the tasks:
-- Encode classification as **labels**: `plan-ready` | `spike-first`, and
-  `track:<name>`, `wave:<n>`. For `SPIKE-FIRST` tasks in spec mode, prefix the
-  title `SPIKE: …`; in epic mode, add a `spike-first` label without retitling.
+- Encode classification as **labels**: `plan-ready` | `spike-first`,
+  `depth:full` | `depth:lite` | `depth:tdd`, and `track:<name>`, `wave:<n>`. For
+  `SPIKE-FIRST` tasks in spec mode, prefix the title `SPIKE: …`; in epic mode,
+  add a `spike-first` label without retitling. A task carries exactly one
+  `depth:*` label: when a re-run re-classifies it, remove the old one and add
+  the new — unlike the `wp:*` and `ex:*` ladders, depth is a current
+  classification, not history.
+- Record `depth_reason` in the task's notes alongside the edge types, so the
+  reason survives into `bd show` and a later reader can challenge the call
+  without re-deriving it.
 - Add dependencies with `beads:dep`: a `SEQ-PLAN` or `EXEC-GATED` edge → the
   dependent task `depends-on` the parent. Record the **edge type** in the
   dependent task's notes (`EXEC-GATED on <id>` / `SEQ-PLAN on <id>`) so
@@ -210,16 +271,20 @@ Write `docs/plans/<epic-slug>/<date>-<epic-slug>-planning-sequence.md` with **tw
 synchronized representations, in one step:**
 
 1. **Machine-readable block** (frontmatter YAML or a fenced ```json) — the
-   authoritative contract `/workflow-commands:workflow-writing-plans` parses. It carries `epic`
-   (the epic id) plus a `tasks` array of `TASK_SCHEMA` objects **extended with**
-   the real `bead_id`, `track`, and computed `wave` (`wave:n`) — `track` and
-   `wave` augment the base TASK_SCHEMA fields. This is the
-   single authoritative planning toposort — writing-plans consumes `wave:n` and
-   never recomputes it.
-2. **Human-readable body** — the classification-axes legend, the task table
-   (title · plan-readiness · dependency type · depends-on · source ref), the
-   tracks, the wave order with spike gates called out, and a "what changed" note.
-   Mirror the layout of `docs/plans/.../*-planning-sequence.md` examples.
+   authoritative contract `/workflow-commands:workflow-writing-plans` parses. It
+   carries `epic` (the epic id) plus a `tasks` array of `TASK_SCHEMA` objects
+   **extended with** the real `bead_id`, `track`, and computed `wave` (`wave:n`) —
+   `track` and `wave` augment the base TASK_SCHEMA fields. This is the single
+   authoritative planning toposort — writing-plans consumes `wave:n` and never
+   recomputes it. It also carries `plan_depth` + `depth_reason` per task;
+   `/workflow-commands:workflow-writing-plans` **reads** the depth and never
+   re-derives it, so the owner's Step 4 adjustments are what actually take
+   effect.
+2. **Human-readable body** — the classification-axes legend (all three), the
+   task table (title · plan-readiness · plan depth · dependency type ·
+   depends-on · source ref), the depth summary line, the tracks, the wave order
+   with spike gates called out, and a "what changed" note. Mirror the layout of
+   `docs/plans/.../*-planning-sequence.md` examples.
 
 Both halves are written together so they cannot drift.
 
