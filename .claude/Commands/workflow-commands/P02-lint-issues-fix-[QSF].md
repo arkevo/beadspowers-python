@@ -3,14 +3,24 @@ Please analyze and fix lint issues here: $ARGUMENTS.
 ## Analysis Workflow
 
 ### Step 1: Run Static Analysis
-Use `ruff check src/ tests/` to identify all lint issues in the specified path. If no path is provided, analyze the entire project. Also run `mypy src/` for type checking.
+Analysis only reads, so it may look wide; what it may *write* is decided in
+Step 4. Choose the files to analyse in this order:
+
+1. the path given as the argument above, if there is one;
+2. otherwise the task's changed set, `modified_files` in
+   `.beads/.session-state.json`;
+3. otherwise, as a last resort, the whole project (`src/ tests/`).
+
+Reading the whole project never widens the write scope. Step 4's auto-fix is
+still limited to the changed set, and is skipped entirely when the changed set is
+unknown (`.claude/rules/verification-write-scope.md`).
 
 ```bash
-# Lint errors and warnings
-ruff check src/ tests/
+# Lint errors and warnings (read-only)
+ruff check <files to analyse>
 
-# Type checking
-mypy src/
+# Type checking (read-only)
+mypy <files to analyse>
 ```
 
 ### Step 2: Run Dead Code Analysis
@@ -29,6 +39,9 @@ ruff check --select F401 src/
 - Exported public APIs (`__all__`)
 - Code used via dynamic dispatch or dependency injection
 - `__dunder__` methods (excluded by convention)
+
+Dead-code findings in files outside the changed set are reported, never fixed:
+record them, and if one matters, open a bead for it.
 
 ### Step 3: Categorize All Issues
 Combine issues from ruff, mypy, and vulture into a Markdown checklist:
@@ -49,19 +62,28 @@ Format each item as:
 - [ ] `file_path:line_number` - Issue description (source: ruff/mypy/vulture)
 ```
 
-### Step 4: Auto-Fix Where Possible
-Before manual fixes, run `ruff check --fix` to automatically resolve common issues like:
-- Unused imports removal
-- Missing whitespace and formatting
-- Simple style fixes
-- Import organization
+### Step 4: Auto-Fix — scoped to the changed set, or skipped
+Never auto-fix outside the task's changed set. Run the `scoped-ruff-fix` block
+from `.claude/Commands/workflow-commands/references/scoped-ruff.md`, unchanged (the policy it
+implements is `.claude/rules/verification-write-scope.md`). In short, it:
 
-```bash
-ruff check --fix src/ tests/
-```
+- reads the changed set and keeps only the Python files that are safe to rewrite
+  (nothing under `.venv/`, `vendor/`, `third_party/` or `migrations/`, no
+  generated `*_pb2.py`; notebooks are linted but never rewritten);
+- skips entirely, without calling ruff, when the changed set is unknown or holds
+  no Python files — it never widens to the project root;
+- previews with `ruff check --diff`, applies `ruff check --fix --force-exclude` to
+  those files only, then compares `git status` with its snapshot and restores and
+  reports any file outside the set that changed.
+
+It typically resolves unused imports, import sorting and simple style issues.
+
+A whole-project cleanup is legitimate, but as its own task with its own bead and
+its own review — never as a side effect of fixing something else.
 
 ### Step 5: Manual Fixes
-Address remaining issues one by one:
+Address the remaining issues in the changed set one by one (an issue in a file
+outside the changed set is reported, not fixed):
 1. Mark the current issue as in-progress
 2. Read the relevant code section using the Read tool
 3. Apply the fix following the project's `[tool.ruff]` settings in `pyproject.toml`
@@ -69,23 +91,25 @@ Address remaining issues one by one:
 5. Check off the completed item before moving to the next
 
 **For vulture unused code:**
+- Only remove code in files inside the changed set; a finding anywhere else is
+  recorded in the report (and, if it matters, filed as its own bead), never fixed
+  here
 - Verify the code is truly unused (not an entry point or public API)
 - Check `__all__` exports and dynamic usage before removing
 - If confirmed unused, remove the code
 - If it's a false positive, note it and skip
 
 ### Step 6: Format and Verify
-1. Run `ruff format src/ tests/` on modified files
-2. Run final `ruff check src/ tests/` to confirm all lint issues are resolved
-3. Re-run `mypy src/` to confirm type errors are resolved
-4. Optionally re-run `vulture src/` to confirm unused code is removed
-5. Report summary of fixes applied
-
-```bash
-ruff format src/ tests/
-ruff check src/ tests/
-mypy src/
-```
+1. Format with the `scoped-ruff-format` block from
+   `.claude/Commands/workflow-commands/references/scoped-ruff.md`, unchanged. It formats only the changed set's
+   Python files with `ruff format --force-exclude`, re-checks them with
+   `ruff format --check`, and reports anything that changed outside the set.
+2. Run a final `ruff check --force-exclude` on the files from Step 1 to confirm
+   the lint issues are resolved.
+3. Re-run `mypy` on the same files to confirm the type errors are resolved.
+4. Optionally re-run `vulture src/` (read-only) to confirm the unused code is gone.
+5. Report a summary of the fixes applied, including the blocks' `Auto-fixed:` and
+   `Scope check:` lines.
 
 ## Priority Guidelines
 1. Fix ruff errors first (E-codes and F-codes — blocking or critical issues)
@@ -96,14 +120,14 @@ mypy src/
 6. Skip info-level hints unless specifically requested
 
 ## Tools to Use
-- Bash: `ruff check src/ tests/` — run Python lint analysis
-- Bash: `ruff check --fix src/ tests/` — apply automatic fixes
-- Bash: `ruff format src/ tests/` — format code consistently
-- Bash: `mypy src/` — run type checking
-- Bash: `vulture src/` — detect unused code
-- Bash: `ruff check --select F401 src/` — detect unused imports
+- Bash: `ruff check <files>` — Python lint analysis (read-only, may run wide)
+- Bash: the `scoped-ruff-fix` block from `.claude/Commands/workflow-commands/references/scoped-ruff.md` — automatic fixes, changed set only
+- Bash: the `scoped-ruff-format` block from the same file — formatting, changed set only
+- Bash: `mypy <files>` — type checking (read-only)
+- Bash: `vulture src/` — detect unused code (read-only)
+- Bash: `ruff check --select F401 src/` — detect unused imports (read-only)
 - Grep/Glob — for targeted code search and pattern matching
-- Read/Edit — for targeted code modifications
+- Read/Edit — for targeted code modifications inside the changed set
 
 ## Important Notes
 - Follow the project's `pyproject.toml [tool.ruff]` configuration

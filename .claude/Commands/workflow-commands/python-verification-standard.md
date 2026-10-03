@@ -28,9 +28,14 @@ Before reviewing any code:
 ### Step 1: Identify Changed Files
 
 - Read `modified_files` from `.beads/.session-state.json`
-- If session state unavailable, ask user for file list
+- If the file is missing or unreadable, **or** `modified_files` is empty, the
+  changed set is **UNKNOWN**. You may ask the user for a file list to guide the
+  review phases, but Phase 2's auto-fix is skipped in this state — never widened
+  to the project root (`.claude/rules/verification-write-scope.md`). A list the
+  user volunteers is a valid changed set; echo it back in the report.
 - Note which directories/layers were affected
-- **Scope all subsequent phases to ONLY these files**
+- **Scope all subsequent phases to ONLY these files**: the review phases report
+  only on them, and nothing outside them is ever written
 
 ### Step 2: Gather Relevant Rules
 
@@ -51,7 +56,8 @@ Before reviewing any code:
 
 ### Step 1: Run Static Analysis
 
-Run ruff and mypy on changed files only:
+Run ruff and mypy on the changed files. Analysis only reads, so when the changed
+set is UNKNOWN, run the same two commands on `src/ tests/` instead:
 
 ```bash
 ruff check <changed_files>
@@ -66,17 +72,25 @@ mypy <changed_files>
 | **Warnings** | Should fix - potential bugs |
 | **Info/Hints** | Consider fixing if quick |
 
-### Step 3: Auto-Fix
+### Step 3: Auto-Fix — scoped to the changed set, or skipped
 
-Run `ruff check --fix` to automatically resolve:
-- Unused imports
-- Import sorting
-- Simple style issues
-- Trailing whitespace
+Never auto-fix outside the task's changed set. Run the `scoped-ruff-fix` block
+from `.claude/Commands/workflow-commands/references/scoped-ruff.md`, unchanged (policy:
+`.claude/rules/verification-write-scope.md`) — never a bare `ruff check --fix`, which rewrites every file it can
+reach. In short, the block reads the changed set; skips without calling ruff when
+the set is UNKNOWN or holds no Python files; previews with `ruff check --diff`;
+applies `ruff check --fix --force-exclude` to the changed Python files only; and
+compares `git status` with its snapshot, restoring and reporting any file outside
+the set that changed.
+
+It typically resolves unused imports, import sorting, simple style issues and
+trailing whitespace. Record the block's `Auto-fixed:` and `Scope check:` lines in
+the report.
 
 ### Step 4: Manual Fixes (if needed)
 
-Address remaining errors and warnings:
+Address the remaining errors and warnings in the changed files (an issue in a
+file outside the changed set is reported, not fixed):
 1. Fix errors first (blocking)
 2. Address warnings that could cause runtime issues
 3. Apply quick style fixes
@@ -321,7 +335,9 @@ Found [X] issues. [Y] auto-fixed. [Z] require attention.
 ---
 
 ### Lint Results (Phase 2)
-**Auto-fixed:** [N] issues
+**Auto-fixed:** [N] issues across [M] changed files
+*(or:* `SKIPPED (changed set unknown)` *or* `SKIPPED (no Python files in the changed set)` *)*
+**Scope check:** no files outside the changed set / **LEAK: [list]**
 **Manual fixes needed:**
 - `file:line` - [description]
 

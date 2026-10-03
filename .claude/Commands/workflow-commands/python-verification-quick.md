@@ -24,8 +24,12 @@ For small changes (< 50 lines), run only essential checks: lint + tests.
 ### Identify Changed Files
 
 1. Read `modified_files` from `.beads/.session-state.json`
-2. Calculate `total_lines_changed` from session state
-3. If session state unavailable, ask user for file list
+2. Read `total_lines_changed` from the same file
+3. If the file is missing or unreadable, **or** `modified_files` is an empty list,
+   the changed set is **UNKNOWN**. Do not ask the user for a file list in order to
+   auto-fix, and do not fall back to the project root: Phase 2 Step 2 skips
+   instead (`.claude/rules/verification-write-scope.md`). A list the user
+   volunteers unprompted is a valid changed set; echo it back in the report.
 
 ---
 
@@ -33,20 +37,26 @@ For small changes (< 50 lines), run only essential checks: lint + tests.
 
 ### Step 1: Run Static Analysis
 
-Run ruff and mypy on changed files only:
+Run ruff and mypy on the changed files. Analysis only reads, so when the changed
+set is UNKNOWN, run the same two commands on `src/ tests/` instead:
 
 ```bash
 ruff check <changed_files>
 mypy <changed_files>
 ```
 
-### Step 2: Auto-Fix
+### Step 2: Auto-Fix — scoped to the changed set, or skipped
 
-Run ruff auto-fix to resolve common issues:
+Never auto-fix outside the task's changed set. Run the `scoped-ruff-fix` block
+from `.claude/Commands/workflow-commands/references/scoped-ruff.md`, unchanged (policy:
+`.claude/rules/verification-write-scope.md`). In short, it reads the changed set; skips without calling ruff when the
+set is UNKNOWN or holds no Python files; previews with `ruff check --diff`, a dry
+run that writes nothing; applies `ruff check --fix --force-exclude` to the changed
+Python files only (`--force-exclude` keeps ruff's own exclude list in force for
+files named on the command line); and then compares `git status` with its
+snapshot, restoring and reporting any file outside the set that changed.
 
-```bash
-ruff check --fix <changed_files>
-```
+Record its `Auto-fixed:` and `Scope check:` lines in the report.
 
 ### Step 3: Report Remaining Issues
 
@@ -109,7 +119,9 @@ If tests FAILED, do NOT write the marker (leave any prior one; the gate stays cl
 Ran lint + tests on [N] changed files ([M] lines total).
 
 ### Lint Results
-**Auto-fixed:** [N] issues with ruff --fix
+**Auto-fixed:** [N] issues across [M] changed files
+*(or:* `SKIPPED (changed set unknown)` *or* `SKIPPED (no Python files in the changed set)` *)*
+**Scope check:** no files outside the changed set / **LEAK: [list]**
 **Remaining:** [N] issues
 - `file:line` - [issue description]
 
@@ -142,9 +154,10 @@ Invoke this skill when:
 |------|-----|
 | Lint analysis | `ruff check <files>` via Bash |
 | Type checking | `mypy <files>` via Bash |
-| Auto-fix | `ruff check --fix <files>` via Bash |
+| Auto-fix | the `scoped-ruff-fix` block from `.claude/Commands/workflow-commands/references/scoped-ruff.md` — changed set only, never unscoped |
 | Run tests | `pytest <files> -v` via Bash |
-| Track files | `.beads/.session-state.json` |
+| Track files | `.beads/.session-state.json` (`modified_files`) |
+| Changed set unknown | Skip auto-fix. Never widen to the project root. |
 
 ---
 

@@ -31,10 +31,20 @@ creating PRs in this codebase.
 Before reviewing any code:
 
 ### Step 1: Identify Changed Files
-- Read `modified_files` from `.beads/.session-state.json` (tracks files changed during execution)
-- If session state is empty or missing, ask user: "What files did you change?"
+- Read `modified_files` from `.beads/.session-state.json`. That list is the
+  task's changed set, recorded by `workflow-commands:beads-post-execution` in
+  its Step 2a: uncommitted edits to tracked files (deletions excluded),
+  untracked files, and the files this branch changed since it left the trunk.
+- If the file is missing or unreadable, or `modified_files` is empty, set
+  `CHANGED_SET = UNKNOWN`. You may ask which files to look at, to steer the
+  review phases, but the answer only decides what gets read, never what gets
+  written: Phase 2 Step 3, Phase 8.5 step 6 and Phase 12.5 step 1 skip their
+  writes in this state and say so in the report, and nothing ever widens to
+  the project root. A file list the user volunteers without being asked is a
+  valid changed set: echo it back, then use it.
 - Note which directories/layers were affected
-- **Scope all subsequent phases to ONLY these files**
+- **Scope all subsequent phases to ONLY these files**, for reading and writing
+  alike (see Scope Control)
 
 ### Step 2: Gather Relevant Rules
 - Read `.claude/rules/` files in affected directories
@@ -64,12 +74,30 @@ Group discovered issues by severity:
 | **Warnings** | Should fix - potential bugs or problematic patterns |
 | **Info/Hints** | Consider fixing - style suggestions (fix if quick) |
 
-### Step 3: Auto-Fix
-Run `ruff check --fix <changed_files>` via Bash to automatically resolve:
-- Unused imports
-- Import sorting
-- Style fixes
-- Whitespace and formatting issues
+### Step 3: Auto-Fix — scoped to the changed set, or skipped
+
+The binding rule is `.claude/rules/verification-write-scope.md`, which is
+always loaded; follow it exactly. Run the `scoped-ruff-fix` block from
+`.claude/Commands/workflow-commands/references/scoped-ruff.md`, unchanged: it reads the changed
+set itself, drops deleted files and the paths the rule never auto-fixes, and
+skips without calling ruff when nothing is left. In short:
+
+1. Snapshot `git status --short`.
+2. Preview with `ruff check --diff --force-exclude <files>`, which writes
+   nothing.
+3. Fix with `ruff check --fix --force-exclude <files>`.
+4. Compare `git status --short` with the snapshot. A tracked file outside the
+   changed set that moved is reverted with `git checkout HEAD -- <path>` and
+   reported; an untracked file that appeared is reported, never deleted
+   without approval.
+
+`--force-exclude` is required because ruff ignores its own `exclude` settings
+for files named on the command line. Never run ruff with an empty file list: a
+bare `ruff check --fix` rewrites the whole project. If no Python file is left
+after filtering, or `CHANGED_SET = UNKNOWN`, skip this step and say so in the
+report.
+
+Typically resolves: unused imports, import sorting, and simple style fixes.
 
 ### Step 4: Manual Fixes (if needed)
 Address remaining errors and warnings:
@@ -548,7 +576,12 @@ findings) or no edits were applied, skip directly to Phase 14.
 Collect all `proposed_edits` from the Phase 12 agent response:
 1. Group by file to detect conflicts with existing code
 2. Apply edits using the Edit tool
-3. Run `ruff format <test_files>` via Bash to normalize formatting
+3. First add every test file Phase 12 created to `modified_files` in
+   `.beads/.session-state.json` (read the file, extend that one list, write it
+   back): the rule lets Phase 12 create mirrored tests, and from then on they
+   are part of the task's changes. Then run the `scoped-ruff-format` block from
+   `.claude/Commands/workflow-commands/references/scoped-ruff.md`, unchanged — it formats the
+   changed set (now including those tests) and re-checks it, with the leak check.
 
 ### Step 2: Analyze New Test Files
 
@@ -644,7 +677,10 @@ Found [N] issues before completion.
 ---
 
 ### Lint Fixes Applied (P02-lint-issues-fix)
-- Auto-fixed: [N] issues with ruff check --fix
+- Auto-fixed: [N] issues across [M] changed files
+  *(or:* `SKIPPED (changed set unknown)` *)*
+- Scope check: no files outside the changed set changed
+  *(or:* **LEAK: [list]** *, with what was reverted and what was only reported)*
 - Manual fixes needed: [N] issues
   - `file:line` - [description]
 
@@ -768,7 +804,7 @@ All checks passed.
 ### Architecture Score: X/10
 
 ### Checks Completed:
-- Lint issues (analyzed and auto-fixed)
+- Lint issues (analyzed; auto-fixed inside the changed set only)
 - Rules compliance (.claude/rules/)
 - Bug scan (type hints, async, resource management)
 - Historical context (Beads context)
@@ -970,9 +1006,14 @@ workflows.
 
 ## Scope Control
 
-**Critical:** All phases operate ONLY on changed files identified in Phase 1.
+**Critical:** All phases operate ONLY on the changed set identified in Phase 1,
+for reading AND for writing. The binding rule is
+`.claude/rules/verification-write-scope.md`: read wide, write narrow.
 
-- **Never scan the entire codebase**
+### Read scope
+
+- **Never scan the entire codebase for findings.** A phase may read other files
+  for context, but it reports findings only for the changed set.
 - Lint analysis: changed files only
 - Code review: changed files only
 - Architecture validation: changed files + immediate dependencies
@@ -981,6 +1022,35 @@ workflows.
 - Silent failure hunt: error handling in changed files only
 - Comment analysis: comments in changed files only
 - Test coverage: tests corresponding to changed source files in `src/` only
+
+### Write scope
+
+Anything that writes touches only files inside the changed set. That covers
+`ruff check --fix`, `ruff format`, and every edit an agent proposes in Phases
+6-8, 8.7 and 12:
+
+- Phase 2 Step 3, Phase 8.5 step 6 and Phase 12.5 step 1 run the
+  `scoped-ruff-fix` and `scoped-ruff-format` blocks from
+  `.claude/Commands/workflow-commands/references/scoped-ruff.md`, unchanged: always with
+  `--force-exclude`, never with an empty file list.
+- An agent edit proposed for a file outside the changed set is reported, not
+  applied.
+- One exception: Phase 12 may create new test files under `tests/` that mirror
+  a changed module, and adds each one to `modified_files` so the write blocks
+  cover it.
+- Never auto-fixed, even inside the changed set: `.venv/`, `vendor/`,
+  `third_party/`, generated code such as `*_pb2.py`, and `migrations/` (a
+  protected path). Notebooks (`.ipynb`) are linted and reported only.
+- `CHANGED_SET = UNKNOWN` skips every write, and the report says so. Never
+  widen to the project root, and never ask for a file list just to justify a
+  fix.
+- A whole-project cleanup is its own task, with its own bead and review.
+
+**After every step that writes,** compare `git status --short` with the
+snapshot taken before it. A tracked file outside the changed set that moved is
+a leak: revert it with `git checkout HEAD -- <path>` (it was clean before, so
+nothing is lost) and list it in the report. An untracked file outside the set
+is reported, never deleted without approval.
 
 ---
 
@@ -1149,8 +1219,15 @@ Codex results:
 4. **Detect conflicts** - if two agents propose edits to overlapping code:
    - Present both edits to user
    - Ask which to apply (or both if non-overlapping)
-5. **Apply non-conflicting edits** using the Edit tool
-6. **Run `ruff format`** to normalize formatting after edits
+5. **Apply non-conflicting edits** using the Edit tool, to files inside the
+   changed set only. An edit proposed for any other file is listed in the
+   report, not applied (Scope Control, Write scope).
+6. **Format inside the changed set only**: run the `scoped-ruff-format` block
+   from `.claude/Commands/workflow-commands/references/scoped-ruff.md`, unchanged. It formats the
+   changed set's Python files — which include every file step 5 may edit — and
+   re-checks them with the leak check. Never a bare `ruff format`, which
+   rewrites every file in the project. If step 5 edited no Python file, skip
+   this.
 7. **Note applied edits** in the verification report
 
 **Conflict Detection Rules:**
@@ -1239,7 +1316,7 @@ Verification Triggered
 | - Group by file, detect conflicts   |
 | - Apply non-conflicting edits       |
 | - Prompt user for conflicts         |
-| - Run ruff format to normalize      |
+| - Scoped ruff format + leak check   |
 +-------------------------------------+
         |
         v

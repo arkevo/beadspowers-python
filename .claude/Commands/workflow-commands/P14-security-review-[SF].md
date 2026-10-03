@@ -35,7 +35,7 @@ This phase auto-triggers in Standard verification when changes include:
 **For local changes:**
 ```bash
 # Check session state for modified files
-cat .beads/.session-state.json | jq '.modified_files[].path'
+cat .beads/.session-state.json | jq -r '.modified_files[]'
 ```
 
 **For PR:**
