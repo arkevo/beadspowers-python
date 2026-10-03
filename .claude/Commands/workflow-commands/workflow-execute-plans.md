@@ -209,7 +209,8 @@ unapproved:
 Read `wp:approved` (+ scope-level approval, `wp:deferred` tasks excluded) on
 start → only run approved tasks. Report every `wp:deferred` task in the
 Step 8 summary as "will run on a future pass, once `<upstream>` executes" —
-never as a blocker to fix.
+never as a blocker to fix. A task deferred for its depth or effort (its notes
+say so) is reported as needing the owner's call instead.
 
 ### 0c — Resume in-flight tasks
 
@@ -312,9 +313,11 @@ order:
    `superpowers:subagent-driven-development`) to work the plan file.
    *(End label: `ex:executing`.)*
 
-   > **A task card is not a plan.** When the plan file's frontmatter carries
-   > `plan_depth: tdd-direct` (the task is labelled `wp:carded`),
-   > `/workflow-commands:workflow-writing-plans` wrote a task card for a task the
+   > **A task card is not a plan.** The plan file's frontmatter `plan_depth`
+   > alone decides the mode (`tdd-direct` → task card, run test-first). When a
+   > plan file is a task card (its frontmatter says `plan_depth: tdd-direct`;
+   > such a task normally carries `wp:carded`),
+   > `/workflow-commands:workflow-writing-plans` wrote it for a task the
    > Sizing Gate put in Lane A. There are no plan steps to work through: write
    > the failing pytest test the card names, run it and watch it fail for the
    > reason the card expects, implement until it passes, and stop. Never rebuild
@@ -547,7 +550,8 @@ every task's `ex:*` / `wp:*` label via `beads:show` / `beads:list` and say:
   this run (per Step 0b) and name what it's waiting on. This is expected
   behavior, not a failure — present it that way, and note that a fresh
   `/workflow-commands:workflow-writing-plans` run will pick each one up once its upstream
-  executes.
+  executes. A task deferred for its depth or effort is reported as needing the
+  owner's call instead (its notes say which).
 - **Cross-epic scope** — if this run operated on an `exec:<slug>` closure
   (Step 0a), say so and scope the "fully executed" check to that whole
   closure, not just the named epic.
@@ -588,7 +592,9 @@ When anything is left, name the step that finishes it instead:
 - **A `wp:deferred` or unplanned task:** `/workflow-commands:workflow-writing-plans <epic-id>`
   once its upstream has executed, or ask the owner whether to move it out of the
   epic. Waiting on something outside the epic means the epic is not done yet —
-  say so, and do not work around it by shipping.
+  say so, and do not work around it by shipping. For a task deferred for its
+  depth or effort, the owner's call comes first: re-classify it or override it at
+  the next writing-plans preview.
 - **An `ex:blocked` task:** the fix pass for the bug it filed (Step 7).
 - **An open attended or ops step:** name the owner action it needs.
 

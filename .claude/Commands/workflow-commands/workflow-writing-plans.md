@@ -99,7 +99,10 @@ preview. Never infer the cheapest option from a missing field.
 If drafting a task reveals that its depth is plainly wrong (a "two-file" task
 turns out to touch a migration), **stop that task, label it `wp:deferred`, and
 report it** for re-classification. Do not quietly upgrade it mid-flight: the
-depth is also what the owner budgeted at the preview gate.
+depth is also what the owner budgeted at the preview gate. When deferring for
+this reason, record it on the task with `beads:update` — an appended notes line
+`wp:deferred (depth): <what is wrong>` — so later runs and reports can tell it
+from an upstream wait.
 
 **Consume precomputed waves — do not recompute.** The `wave:n` ordering is
 authoritative (computed once by `/workflow-commands:workflow-planning-sequence`). This command
@@ -192,7 +195,10 @@ How effort flows through the run:
 - **Harder than expected:** if drafting shows a task is harder than its effort
   (a "lite" task turns out to need a migration), handle it like the wrong-depth
   case in "Input" above: label it `wp:deferred` and report it. Don't silently
-  re-run it at a higher effort.
+  re-run it at a higher effort. When deferring for this reason,
+  record it on the task with `beads:update` — an appended notes line
+  `wp:deferred (effort): <what is wrong>` — so later runs and reports can tell
+  it from an upstream wait.
 
 ### Apply step and concurrency
 
@@ -295,7 +301,10 @@ correctly flows into Step 4 instead of jumping to the approval stamp.
 3. **Reconcile** the file's task set against the epic's beads tasks; report
    orphans both directions; continue with the intersection.
 4. Group the plannable tasks by their precomputed `wave:n`, and split out the
-   **deferred set** (`EXEC-GATED` tasks whose upstream is not yet executed).
+   **deferred set** (`EXEC-GATED` tasks whose upstream is not yet executed, and
+   any task whose notes carry a `wp:deferred (depth)` or `wp:deferred (effort)`
+   line and whose depth or effort has not changed since — unless the owner
+   overrides it at Step 2).
 5. **Assign each plannable task its effort** (`medium` / `high` / `xhigh`) from
    "Effort by difficulty". For `xhigh`, note which hard trigger applied so the
    Step 2 preview can name it.
@@ -318,6 +327,7 @@ Wave 1 (parallel, plan now):            N
 Wave 2 (seq-plan, after wave 1):        M
 Spikes (lightweight plan now):          S
 Deferred (exec-gated, blocked):         K   ← planned on a later run, after upstream executes
+Deferred for depth/effort — needs your call: <task-id: reason>, … (override depth or effort for this run, or re-classify with /workflow-commands:workflow-planning-sequence)
 Resuming: R from prior stages · skipping J already approved
 
 Plan depth: F full (refined) · L lite (no refinement) · T tdd-direct (task card only)
@@ -347,7 +357,12 @@ than assigned, they say so here and it is honoured for this run — the same
 override the planning-sequence review gate offers, available once more before
 any spend. The effort line works the same way: the owner can move any task
 between `medium`, `high` and `xhigh` here, and that choice wins over the
-difficulty table for this run.
+difficulty table for this run. An override lasts for this run only: the plan is
+authored at the overridden depth and its frontmatter `plan_depth` records that
+depth, while the sequence block and the `depth:*` label keep the classified
+value — so a re-run or a resume after a crash uses the block's depth again
+unless the owner restates the override. To make it permanent, re-classify with
+`/workflow-commands:workflow-planning-sequence`.
 
 Show the **Branches** line only when the run includes at least one `PLAN-FULL`
 plan. Only those reach Step 6's apply agents, so a run of lite plans, task cards
@@ -453,7 +468,7 @@ frontmatter:
 smoke_test: required | none
 smoke_steps: "..."   # human steps to smoke the change; "" when none
 bead_id: <task-id>
-plan_depth: full | lite | tdd-direct   # from the sequence block; spike plans omit it
+plan_depth: full | lite | tdd-direct   # the depth this run uses: the sequence block's value, or the owner's Step 2 override; spike plans omit it
 status: draft
 ---
 ```
@@ -691,7 +706,9 @@ frontmatter `status: approved`.
 This is the **plan-ready handoff**: `/workflow-commands:workflow-execute-plans` requires both
 `wp:approved` and `status: approved` before it will execute a plan. **Deferred
 (`wp:deferred`) tasks are not approved** — they are reported as blocked and
-picked up on a later run once their upstream is executed. If
+picked up on a later run once their upstream is executed. A task deferred for
+its depth or effort (its notes say so) is picked up once the owner
+re-classifies it or overrides it at Step 2. If
 `/workflow-commands:workflow-execute-plans` is not yet installed, **stop at `wp:approved`** — the
 plannable plans are complete; execution is handed off separately.
 
@@ -710,7 +727,10 @@ earlier wave) via `beads:show` / `beads:list`, and explain:
   blocking upstream and say plainly whether that upstream is a spike waiting
   on `/workflow-commands:workflow-execute-spikes`, or a task waiting on `/workflow-commands:workflow-execute-plans`
   to actually build it. This is expected pipeline behavior, not an error —
-  say so plainly rather than presenting it as a problem.
+  say so plainly rather than presenting it as a problem. A task deferred for its
+  depth or effort is different: it needs the owner's call — re-classify it with
+  `/workflow-commands:workflow-planning-sequence`, or override it at the next
+  preview — so present it as a decision, not a wait.
 - **Whether execution-sequence will matter** — if any approved task has a
   cross-epic `blocks`-predecessor with no `exec:<slug>` label yet, note that
   `/workflow-commands:workflow-execution-sequence` will be needed before `/workflow-commands:workflow-execute-plans`
