@@ -34,7 +34,7 @@
         <mxCell id="11" value="6 · Ship the epic&#xa;/workflow-commands:workflow-ship-epic&#xa;→ PR opened (sh:pushed)&#xa;→ sh:shipped after merge" style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#d8e4f0;strokeColor=#2f5c94;fontColor=#1a1a1a;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1" parent="1">
           <mxGeometry x="560" y="1160" width="380" height="112" as="geometry" />
         </mxCell>
-        <mxCell id="12" value="Go back to the phase&#xa;the leftover tasks are in:&#xa;unplanned → step 3&#xa;unordered → step 4" style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#f5dede;strokeColor=#a34a4a;fontColor=#1a1a1a;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1" parent="1">
+        <mxCell id="12" value="Go back to the phase&#xa;the leftover tasks are in:&#xa;unplanned → Write the plans&#xa;unordered → Order the work" style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#f5dede;strokeColor=#a34a4a;fontColor=#1a1a1a;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1" parent="1">
           <mxGeometry x="172" y="1357" width="238" height="112" as="geometry" />
         </mxCell>
         <mxCell id="13" value="⚠ Context hygiene&#xa;/clear between phases.&#xa;Mid-phase, past roughly 30–50% of the&#xa;context window: ask for a handoff doc,&#xa;/clear, and paste it back." style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#fdf6d8;strokeColor=#b09a3c;fontColor=#1a1a1a;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1" parent="1">
@@ -55,7 +55,7 @@
         <mxCell id="18" value="yes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;startArrow=none;endArrow=block;endSize=7;strokeColor=light-dark(#333333,#cccccc);html=1;fontSize=16;labelBackgroundColor=light-dark(#E8E8E88D,#2a2a2a8D);fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontColor=light-dark(#333333,#cccccc);exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="5" target="6">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="19" value="then re-run step 3: it plans&#xa;the tasks the spikes unblocked" style="edgeStyle=orthogonalEdgeStyle;rounded=1;startArrow=none;endArrow=block;endSize=7;strokeColor=light-dark(#333333,#cccccc);html=1;fontSize=16;labelBackgroundColor=light-dark(#E8E8E88D,#2a2a2a8D);fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontColor=light-dark(#333333,#cccccc);exitX=0.5;exitY=0;entryX=1;entryY=0.5;" edge="1" parent="1" source="6" target="7">
+        <mxCell id="19" value="then re-run Write the plans: it plans&#xa;the tasks the spikes unblocked" style="edgeStyle=orthogonalEdgeStyle;rounded=1;startArrow=none;endArrow=block;endSize=7;strokeColor=light-dark(#333333,#cccccc);html=1;fontSize=16;labelBackgroundColor=light-dark(#E8E8E88D,#2a2a2a8D);fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontColor=light-dark(#333333,#cccccc);exitX=0.5;exitY=0;entryX=1;entryY=0.5;" edge="1" parent="1" source="6" target="7">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="770" y="492" />
@@ -79,6 +79,14 @@
             <Array as="points">
               <mxPoint x="30" y="1413" />
               <mxPoint x="30" y="492" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="26" style="edgeStyle=orthogonalEdgeStyle;rounded=1;startArrow=none;endArrow=block;endSize=7;strokeColor=light-dark(#333333,#cccccc);exitX=0;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="12" target="8">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="30" y="1413" />
+              <mxPoint x="30" y="885.5" />
             </Array>
           </mxGeometry>
         </mxCell>
