@@ -45,6 +45,16 @@ for pattern in "${DANGEROUS_PATTERNS[@]}"; do
     fi
 done
 
+# The quick-allow list below applies only to a single simple command. A command
+# that chains (; & && ||), pipes (|), substitutes ($( ) or backticks, <( ) >( )),
+# redirects output (>), or spans lines can hide a second action behind an allowed
+# first word, so it gets no auto-allow and falls through to the normal prompt.
+case "$COMMAND" in
+    *$'\n'*|*$'\r'*|*';'*|*'&'*|*'|'*|*'`'*|*'$('*|*'<('*|*'>'*)
+        exit 0
+        ;;
+esac
+
 # Explicitly allow safe commands so they bypass permission prompts
 SAFE_PATTERNS=(
     "^cd "

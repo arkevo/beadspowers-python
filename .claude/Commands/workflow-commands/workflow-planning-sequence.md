@@ -135,6 +135,30 @@ From Axes 1 and 2, compute (plan depth changes none of these):
 Each step is tagged **[workflow]** (detached, non-interactive) or **[main ctx]**
 (needs the user). Never collect user input inside a Workflow.
 
+### 0. [main ctx] Check for a finished epic that never shipped
+Before loading anything, run the check in
+`.claude/rules/0_Beads x Superpowers/surface-unshipped-epics.md` (Rules 1 and 2):
+
+- **Finished but never shipped:** an epic whose open children all carry
+  `ex:done` while the epic itself has neither `sh:pushed` nor `sh:shipped`. Find
+  candidates with `beads:list --type=epic --all`, then read each one's children
+  with `beads:list --parent <epic-id> --all`.
+- **PR opened, not merged:** a closed epic carrying `sh:pushed` but not
+  `sh:shipped` — its integration PR was opened on the epic's close date and the
+  merge has not been confirmed yet.
+- **Stacking onto an unmerged branch:** run `git fetch origin`, then compare the
+  current branch with the trunk (`git rev-list --left-right --count <trunk>...HEAD`,
+  where `<trunk>` comes from `git symbolic-ref --short refs/remotes/origin/HEAD`).
+  If the branch already carries another epic's unmerged commits, name that epic
+  and the commit count, and say that shipping this branch would ship both.
+
+If any of these turns up, surface it in the rule's words and ask before going
+on: ship the finished epic first (`/workflow-commands:workflow-ship-epic <epic-id>`),
+merge the open PR and re-run `/workflow-commands:workflow-ship-epic <epic-id>` so
+it confirms the merge and adds `sh:shipped`, or proceed and stack the new work
+on top. It is a surface-and-ask, not a hard stop — what must never happen is
+stacking silently. When nothing turns up, continue without comment.
+
 ### 1. [main ctx] Load input (spec mode or epic mode)
 Resolve the mode (flags first, then the fail-loud heuristic above).
 

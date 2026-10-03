@@ -247,7 +247,7 @@ Stage labels advance at the **END** of each step.
 
 | # | Step | Where | End label |
 |---|------|-------|-----------|
-| 0 | Resume check (idempotency) | main ctx | — |
+| 0 | Unshipped-epic check, then resume check (idempotency) | main ctx | — |
 | 1 | Load sequence file (parse block, resolve epic, reconcile) | main ctx | — |
 | 2 | Preview & budget gate (by wave + deferred set) | main ctx | — |
 | 3 | Sequence-aware draft (conditional, depth-driven) | **workflow** | `wp:drafted` / `wp:skipped` / `wp:carded` / `wp:deferred` |
@@ -264,11 +264,35 @@ know which depth produced a file.
 
 ---
 
-## Step 0: Resume Check (idempotency) [main ctx]
+## Step 0: Unshipped-Epic Check, then Resume Check [main ctx]
 
-On every start, **before doing any work**, read each task's `wp:*` stage label
-(via `beads:show` / `beads:list`) and **resume each task from its furthest
-stage** — skip steps already completed.
+**0a — Check for a finished epic that never shipped.** Before touching this
+epic, run the check in `.claude/rules/0_Beads x Superpowers/surface-unshipped-epics.md`
+(Rules 1 and 2):
+
+- **Finished but never shipped:** an epic whose open children all carry
+  `ex:done` while the epic itself has neither `sh:pushed` nor `sh:shipped`. Find
+  candidates with `beads:list --type=epic --all`, then read each one's children
+  with `beads:list --parent <epic-id> --all`.
+- **PR opened, not merged:** a closed epic carrying `sh:pushed` but not
+  `sh:shipped` — its integration PR was opened on the epic's close date and the
+  merge has not been confirmed yet.
+- **Stacking onto an unmerged branch:** run `git fetch origin`, then compare the
+  current branch with the trunk (`git rev-list --left-right --count <trunk>...HEAD`,
+  where `<trunk>` comes from `git symbolic-ref --short refs/remotes/origin/HEAD`).
+  If the branch already carries another epic's unmerged commits, name that epic
+  and the commit count, and say that shipping this branch would ship both.
+
+If any of these turns up, surface it in the rule's words and ask before going
+on: ship the finished epic first (`/workflow-commands:workflow-ship-epic <epic-id>`),
+merge the open PR and re-run `/workflow-commands:workflow-ship-epic <epic-id>` so
+it confirms the merge and adds `sh:shipped`, or proceed and stack this work on
+top. It is a surface-and-ask, not a hard stop — what must never happen is
+stacking silently. When nothing turns up, continue without comment.
+
+**0b — Resume check (idempotency).** Before doing any task work, read each
+task's `wp:*` stage label (via `beads:show` / `beads:list`) and **resume each
+task from its furthest stage** — skip steps already completed.
 
 - A task at **`wp:approved`** is **skipped** (idempotent) **unless** its source
   description changed since approval **or** the user passed `--force`.

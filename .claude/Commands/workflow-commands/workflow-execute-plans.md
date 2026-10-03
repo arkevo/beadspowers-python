@@ -122,7 +122,7 @@ Stage labels advance at the **END** of each step.
 
 | # | Step | Where | End label |
 |---|------|-------|-----------|
-| 0 | Scope + precondition + resume check | main ctx | — |
+| 0 | Unshipped-epic check + scope + precondition + resume check | main ctx | — |
 | 1 | Route tasks (autonomous vs attended) | main ctx | — |
 | 2 | Schedule + preview/budget gate | main ctx | — |
 | 3 | Autonomous fan-out: execute (TDD) → QA → auto-advance | **workflow** | `ex:executing` → `ex:qa:<level>` → `ex:done` / `ex:smoke-pending` / `ex:blocked` |
@@ -140,6 +140,36 @@ worth pixel-checking, add a stage label of your own between them.
 ---
 
 ## Step 0: Scope + Precondition + Resume Check (idempotency) [main ctx]
+
+### Pre-check — surface an epic that finished but never shipped
+
+Before resolving scope, apply Rule 1 of
+`.claude/rules/0_Beads x Superpowers/surface-unshipped-epics.md`. Read every epic's
+labels, and its children's, with `beads:list` / `beads:show` in this turn, and
+look for another epic in either state:
+
+- **Finished, never shipped:** every open child is `ex:done`, but the epic has no
+  `sh:*` label. Its tasks are still open and its code is not on the trunk.
+- **PR opened, not merged:** the epic carries `sh:pushed` but not `sh:shipped`.
+  `/workflow-commands:workflow-ship-epic` opened its PR and closed its tasks, but
+  nobody has confirmed the merge.
+
+If either exists, say so before anything else, for example:
+
+> ⚠️ Epic **<id> "<title>"** finished executing on <date> but was never shipped —
+> all N open children are `ex:done`, the epic has no `sh:*` label, and its code
+> is not on the trunk.
+
+> ⚠️ Epic **<id> "<title>"**: PR opened on <date>, not merged — it is `sh:pushed`
+> without `sh:shipped`.
+
+> Ship or confirm it with `/workflow-commands:workflow-ship-epic <id>` first, or
+> tell me to proceed and stack this work on top of it.
+
+This is surface-and-ask, not a hard stop: stacking is sometimes right, but never
+silently. Apply Rule 2 of the same file too: before executing on a branch that
+already carries another epic's unmerged commits, name that epic and the commit
+count, and say that shipping this branch will ship both.
 
 ### 0a — Resolve execution scope (epic vs cross-epic closure)
 
@@ -541,6 +571,11 @@ every task's `ex:*` / `wp:*` label via `beads:show` / `beads:list` and say:
 - **Fully executed** — if every task in the resolved scope (Step 0a) is
   `ex:done` and the ship-recommendation gate below finds nothing left, say so
   and name the next command: `/workflow-commands:workflow-ship-epic <epic-id>`.
+  Say plainly that the epic and its tasks stay **open** until that command runs
+  — `ex:done` means executed, not shipped — and that ship-epic closes them when
+  it opens the PR, but the epic counts as shipped only once that PR has merged
+  and a re-run of ship-epic has confirmed it (`sh:shipped`). A pushed branch or
+  an open PR is not a shipped epic.
 - **Blocked bugs** — name every `ex:blocked` task and its filed bug id; these
   need a fix pass before shipping is possible.
 - **Refused at Step 0b** — if the run refused to start because a non-deferred
@@ -693,6 +728,9 @@ Do not notify for purely automated transitions (autonomous execute/QA/auto-merge
 
 ## CRITICAL — Honor Project Rules
 
+- **Unshipped epics first (Step 0 pre-check):** before starting, surface any epic
+  that finished executing but never shipped, or that sits at `sh:pushed` waiting
+  for its PR to merge — surface and ask, never stack new work on it silently.
 - **Scope + approval precondition (Steps 0a–0b):** resolve the execution scope first
   — consume the `exec:<slug>` closure label when present; **refuse a bare cross-epic
   run that has no closure label** (run `/workflow-commands:workflow-execution-sequence` first so the
