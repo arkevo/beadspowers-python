@@ -39,12 +39,15 @@ For small changes (< 50 lines), run only essential checks: lint + tests.
 
 ### Step 1: Run Static Analysis
 
-Run ruff and mypy on the changed files. Analysis only reads, so when the changed
+Run ruff and mypy on the changed set's Python files. `<changed .py/.pyi files>`
+stands for the changed set's `.py`/`.pyi` files only — ruff and mypy fail on
+anything else, such as a `README.md` — and when it has none, skip every command
+that takes it and say so in the report. Analysis only reads, so when the changed
 set is UNKNOWN, run the same two commands on `src/ tests/` instead:
 
 ```bash
-ruff check --no-fix <changed_files>
-mypy <changed_files>
+ruff check --no-fix <changed .py/.pyi files>
+mypy <changed .py/.pyi files>
 ```
 
 ### Step 2: Auto-Fix — scoped to the changed set, or skipped

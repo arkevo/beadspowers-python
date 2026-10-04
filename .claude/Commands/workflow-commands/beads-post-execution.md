@@ -177,13 +177,13 @@ Changes: [N] lines across [M] files (recorded in Step 2a)
 1. **Quick verify** — lint + tests only (~30 sec)
 2. **Standard verify** — analysis phases, no agents (~2 min)
 3. **Full verify** — review agents + Codex adversarial pass (~5+ min)
-4. **Ship it** — skip verification, commit
+4. **Skip verification and ship** — commit without verifying
 
 Recommended: **[Level based on change size]**
 [⚙️ Build validation recommended — say "build check" anytime]  ← include if applicable
 [🔥 Smoke test recommended after verification]  ← include if applicable
 
-Say "quick", "standard", "full", or "ship it" to continue.
+Say "quick", "standard", "full", or "skip verification" to continue.
 ```
 
 ## Natural Language Commands

@@ -39,7 +39,7 @@ branch — whose work should not be proposed for the trunk yet. Then ask before 
 step and name the consequence: "Shipping `<branch>` opens a PR proposing all of its
 current commits to the trunk. Open the PR now, or push the branch only?" Do exactly what
 the user picks, in full. If you are unsure whether a branch is long-lived, ask; normal
-`feat/`, `fix/` and `chore/` branches ship without asking.
+`feat/`, `fix/`, `refactor/`, `hotfix/` and `chore/` branches ship without asking.
 
 If a push is rejected, the remote has commits you don't: fetch, merge the remote branch
 (or the trunk) into yours, re-verify, and push again. Never force-push past a rejected

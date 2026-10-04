@@ -150,7 +150,9 @@ furthest one wins — so resume from the furthest:
      A "not merged" from this fallback can also mean a squash merge, so say so
      when you report it.
   4. **Merged** → add `sh:shipped` to the epic (`beads:label`), read it back with
-     `beads:show`, and go to Step 7 to report the shipped epic. **Still open, or
+     `beads:show`, then run Step 6.5 again, so the new label is published over the
+     Dolt remote and the readable export is refreshed, and go to Step 7 to report
+     the shipped epic. **Still open, or
      unknown** → report "PR open, awaiting merge: <pr-url>" and stop. Nothing
      else happens until the owner merges the PR and runs this command again.
      **Closed without merging** (GitHub says `CLOSED`) → say exactly that: the

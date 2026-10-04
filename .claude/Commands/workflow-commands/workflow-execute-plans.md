@@ -17,8 +17,8 @@ This is the **execution** half of a two-command pair. Its sibling
 `/workflow-commands:workflow-writing-plans` produced the plans this command consumes. It requires
 the **`wp:approved`** beads label **and** plan-frontmatter `status: approved` on
 **every currently-plannable task in the epic** before it will run —
-**`wp:deferred` tasks are exempt** (they genuinely can't be planned yet; see
-the precondition below).
+**tasks still deferred (`wp:deferred` with no later `wp:approved`) are exempt**
+(they genuinely can't be planned yet; see the precondition below).
 
 > **This is the Python variant.** QA runs the
 > **`python-verification-{quick,standard,full}`** skills (ruff + mypy + pytest).
@@ -148,9 +148,9 @@ Before resolving scope, apply Rule 1 of
 labels, and its children's, with `beads:list` / `beads:show` in this turn, and
 look for another epic in either state:
 
-- **Finished, never shipped:** an **open** epic whose open children are all
-  `ex:done`, but which has no `sh:*` label. Its tasks are still open and its
-  code is not on the trunk.
+- **Finished, never shipped:** an **open** epic with at least one `ex:done`
+  child, whose open children are all `ex:done`, and which carries no `sh:*`
+  label. Its tasks are still open and its code is not on the trunk.
 - **PR opened, not merged:** the epic carries `sh:pushed` but not `sh:shipped`.
   `/workflow-commands:workflow-ship-epic` opened its PR and closed its tasks, but
   nobody has confirmed the merge.
@@ -197,20 +197,21 @@ Exclude `closed` tasks from the scope (their edges are already satisfied), mirro
 `/workflow-commands:workflow-execution-sequence` Step 2. Everywhere below, **"the epic's tasks" means
 this resolved scope.**
 
-### 0b — Approval precondition (HARD GATE, `wp:deferred` exempt)
+### 0b — Approval precondition (HARD GATE, still-deferred tasks exempt)
 
 This command requires **scope-level approval** — but only over the portion of
-the resolved scope (Step 0a) that is actually plannable right now. A task
-carrying **`wp:deferred`** (an `EXEC-GATED` task whose upstream hasn't been
-**executed** yet — see `/workflow-commands:workflow-writing-plans`) is **excluded from this gate
+the resolved scope (Step 0a) that is actually plannable right now. A task that
+is **still deferred (`wp:deferred` with no later `wp:approved`)** — typically an
+`EXEC-GATED` task whose upstream hasn't been **executed** yet; see
+`/workflow-commands:workflow-writing-plans` — is **excluded from this gate
 entirely**. Its absence isn't incomplete planning; it's the pipeline correctly
-waiting on an earlier wave to execute. Requiring `wp:deferred` tasks to be
+waiting on an earlier wave to execute. Requiring still-deferred tasks to be
 approved up front would make any multi-wave epic permanently unexecutable —
 wave *N+1* can't be approved until wave *N* is *executed*, and executing wave
 *N* is this command's own job.
 
 Before any execution work, verify **every task in the resolved scope that is
-NOT `wp:deferred`** has BOTH:
+NOT still deferred** has BOTH:
 
 1. the beads label **`wp:approved`**, and
 2. plan frontmatter **`status: approved`** in its `docs/plans/<epic-slug>/<task-id>-<slug>.md`.
@@ -224,9 +225,9 @@ one wins.
 
 It will still **NOT execute a partial trickle among the plannable set** — a
 task that is genuinely mid-planning (drafted but not yet approved, and **not**
-`wp:deferred`) still blocks the whole run, since planning could still change
-any plan. Only `wp:deferred` tasks are exempt. If **any non-deferred task** is
-unapproved:
+still deferred) still blocks the whole run, since planning could still change
+any plan. Only still-deferred tasks are exempt. If **any task that is not still
+deferred** is unapproved:
 
 > ⚠️ Epic **<epic-id>** is not fully approved. These tasks are missing
 > `wp:approved` / `status: approved`:
@@ -236,12 +237,14 @@ unapproved:
 > approved. Finish planning with `/workflow-commands:workflow-writing-plans` first, or pick a
 > different epic.
 
-**Refuse to execute the unapproved (non-deferred) tasks; warn on the rest.**
-Read `wp:approved` (+ scope-level approval, `wp:deferred` tasks excluded) on
-start → only run approved tasks. Report every `wp:deferred` task in the
-Step 8 summary as "will run on a future pass, once `<upstream>` executes" —
-never as a blocker to fix. A task deferred for its depth or effort (its notes
-say so) is reported as needing the owner's call instead.
+**Refuse to execute the unapproved tasks that are not still deferred; warn on
+the rest.** Read `wp:approved` (+ scope-level approval, still-deferred tasks
+excluded) on start → only run approved tasks; a task carrying `wp:deferred` and
+a later `wp:approved` is approved, and it runs. Report every task that is still
+deferred (`wp:deferred` with no later `wp:approved`) in the Step 8 summary as
+"will run on a future pass, once `<upstream>` executes" — never as a blocker to
+fix. A task deferred for its depth or effort (its notes say so) is reported as
+needing the owner's call instead.
 
 ### 0c — Resume in-flight tasks
 
@@ -312,7 +315,9 @@ estimate is a **heuristic band, not an exact meter.**
 Approved tasks: M  (resuming K from prior ex:* stages, J already ex:done)
   • Autonomous (parallel, worktree-isolated): A
   • Attended (serialized — smoke / substrate / protected path): B
-Deferred (wp:deferred, waiting on an earlier wave): D  ← not part of this run
+Still deferred (wp:deferred, no later wp:approved): D  ← not part of this run
+  • Waiting on an earlier wave: W
+  • Deferred for depth/effort — needs your call: <task-id: reason>, … (re-classify, or override at the next writing-plans preview)
 Smoke gates to batch at the end: S
 Concurrency cap: min(16, cores−2)
 Estimated cost: ~X–Y% of the 5-hr usage limit
@@ -579,11 +584,12 @@ every task's `ex:*` / `wp:*` label via `beads:show` / `beads:list` and say:
   an open PR is not a shipped epic.
 - **Blocked bugs** — name every `ex:blocked` task and its filed bug id; these
   need a fix pass before shipping is possible.
-- **Refused at Step 0b** — if the run refused to start because a non-deferred
-  task was unapproved, restate which tasks are missing approval and point to
-  `/workflow-commands:workflow-writing-plans`.
-- **Waiting on an earlier wave** — list every `wp:deferred` task excluded from
-  this run (per Step 0b) and name what it's waiting on. This is expected
+- **Refused at Step 0b** — if the run refused to start because a task that is
+  not still deferred was unapproved, restate which tasks are missing approval and
+  point to `/workflow-commands:workflow-writing-plans`.
+- **Waiting on an earlier wave** — list every task still deferred (`wp:deferred`
+  with no later `wp:approved`), and so excluded from this run (per Step 0b), and
+  name what it's waiting on. This is expected
   behavior, not a failure — present it that way, and note that a fresh
   `/workflow-commands:workflow-writing-plans` run will pick each one up once its upstream
   executes. A task deferred for its depth or effort is reported as needing the
@@ -603,7 +609,7 @@ applies now — never a menu of every possibility:
   3. Merge the PR.
   4. `/workflow-commands:workflow-ship-epic <epic-id>` again — confirms the merge
      and marks the epic shipped.
-- **Deferred tasks this wave unblocked:**
+- **Still-deferred tasks this wave unblocked:**
   1. `/clear`
   2. `/workflow-commands:workflow-writing-plans <epic-id>` — plans them.
 - **Refused at Step 0b:**
@@ -755,10 +761,11 @@ Do not notify for purely automated transitions (autonomous execute/QA/auto-merge
   — consume the `exec:<slug>` closure label when present; **refuse a bare cross-epic
   run that has no closure label** (run `/workflow-commands:workflow-execution-sequence` first so the
   enablers aren't silently skipped). Then never execute a partial trickle among the
-  **plannable** set: require `wp:approved` + `status: approved` on every non-deferred
-  task in that scope; refuse the unapproved ones. **`wp:deferred` tasks are exempt**
-  from this gate — they can't be planned until an earlier wave executes, and this
-  command is what executes it.
+  **plannable** set: require `wp:approved` + `status: approved` on every task in
+  that scope that is not still deferred; refuse the unapproved ones. **Still-deferred
+  tasks (`wp:deferred` with no later `wp:approved`) are exempt** from this gate —
+  they can't be planned until an earlier wave executes, and this command is what
+  executes it.
 - **Spikes run elsewhere:** `SPIKE-FIRST` tasks are executed by
   `/workflow-commands:workflow-execute-spikes` (lightweight prototype + findings) and are closed before
   this command runs — never execute a spike through this command.

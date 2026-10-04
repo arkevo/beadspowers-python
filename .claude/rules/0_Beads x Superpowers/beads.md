@@ -104,7 +104,10 @@ the write serially and read it back.
 - **`bd doctor` proves nothing in embedded mode** — it exits cleanly whatever state the
   store is in, so never use it as a readiness gate. Verify a store with
   `bd list -n 0 | wc -l` against a known count (plain `bd list` stops at 50 rows), plus
-  non-zero `manifest` and `journal.idx` files under `.beads/embeddeddolt/`.
+  non-zero `manifest` and `journal.idx` files, which live under
+  `.beads/embeddeddolt/<db>/.dolt/noms/`:
+  `find .beads/embeddeddolt \( -name manifest -o -name journal.idx \) -size +0 -print`
+  must print both.
 - If `bd` in a worktree returns `[]`, errors, or reports "database is locked", load the
   `beads-worktree-troubleshooting` skill.
 

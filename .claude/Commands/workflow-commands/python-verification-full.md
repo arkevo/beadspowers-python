@@ -73,8 +73,12 @@ Before reviewing any code:
 **Run this early to clean up code before deeper analysis.**
 
 ### Step 1: Run Static Analysis
-Run `ruff check --no-fix <changed_files>` and `mypy <changed_files>` via Bash on the
-changed files only (not entire codebase).
+Run `ruff check --no-fix <changed .py/.pyi files>` and `mypy <changed .py/.pyi files>`
+via Bash on the changed files only (not entire codebase). `<changed .py/.pyi files>`
+stands for the changed set's `.py`/`.pyi` files only — ruff and mypy fail on
+anything else, such as a `README.md` — and when it has none, skip every command
+that takes it and say so in the report. Analysis only reads, so when
+`CHANGED_SET = UNKNOWN`, run the same two commands on `src/ tests/` instead.
 
 ### Step 2: Categorize Issues
 Group discovered issues by severity:
@@ -118,8 +122,8 @@ Address remaining errors and warnings:
 4. Skip info-level hints unless specifically requested
 
 ### Step 5: Verify Fixes
-Run `ruff check --no-fix <changed_files>` and `mypy <changed_files>` again on changed
-files to confirm issues resolved.
+Run `ruff check --no-fix <changed .py/.pyi files>` and `mypy <changed .py/.pyi files>`
+again on changed files to confirm issues resolved.
 
 **Important:** Do not introduce new warnings while fixing existing ones.
 
@@ -578,8 +582,8 @@ Exclude these from the final report:
 ## Phase 11: Final Verification
 
 Run final verification sequence:
-1. `ruff check --no-fix <changed_files>` via Bash - Confirm no lint errors remain
-2. `ruff format --check <changed_files>` via Bash - Ensure consistent formatting
+1. `ruff check --no-fix <changed .py/.pyi files>` via Bash - Confirm no lint errors remain
+2. `ruff format --check <changed .py/.pyi files>` via Bash - Ensure consistent formatting
 3. `pytest -v` via Bash - Execute all tests
 
 **All must pass before claiming completion.**
@@ -764,26 +768,32 @@ Check every file in the Phase 1 changed set against these patterns.
 - Database authorization: `GRANT`, `REVOKE`, `CREATE POLICY`,
   `ROW LEVEL SECURITY`, `SECURITY DEFINER`
 
-Run this from the repository root. It prints each matching file once:
+Run this from the repository root. It prints each matching file once — or only
+`CHANGED_SET=UNKNOWN` when the session state is missing or unreadable, or
+`modified_files` is missing or empty:
 
 ```bash
-python3 -c 'import json; [print(p) for p in json.load(open(".beads/.session-state.json")).get("modified_files") or []]' 2>/dev/null |
-while IFS= read -r f; do
-  if printf '%s\n' "$f" | grep -qE '(^|/)src/(.*/)?(auth|api|service[^/]*|repository|network|http)/|(^|/)migrations/|(^|/)alembic/versions/|\.sql$|(^|/)settings(\.py$|/)|(^|/)\.env(\..+)?$'; then
-    echo "$f"
-  elif [ -f "$f" ] && { grep -qiE 'api_?key|secret|token|password|credential' -- "$f" ||
-      grep -qE 'http|requests|httpx|eval\(|exec\(|pickle|yaml\.load|subprocess|shell=True|verify=False|DEBUG|random\.|GRANT|REVOKE|CREATE POLICY|ROW LEVEL SECURITY|SECURITY DEFINER' -- "$f"; }; then
-    echo "$f"
-  fi
-done
+files=$(python3 -c 'import json; [print(p) for p in json.load(open(".beads/.session-state.json")).get("modified_files") or []]' 2>/dev/null)
+if [ -z "$files" ]; then
+  echo "CHANGED_SET=UNKNOWN"
+else
+  printf '%s\n' "$files" | while IFS= read -r f; do
+    if printf '%s\n' "$f" | grep -qE '(^|/)src/(.*/)?(auth|api|service[^/]*|repository|network|http)/|(^|/)migrations/|(^|/)alembic/versions/|\.sql$|(^|/)settings(\.py$|/)|(^|/)\.env(\..+)?$'; then
+      printf '%s\n' "$f"
+    elif [ -f "$f" ] && { grep -qiE 'api_?key|secret|token|password|credential' -- "$f" ||
+        grep -qE 'http|requests|httpx|eval\(|exec\(|pickle|yaml\.load|subprocess|shell=True|verify=False|DEBUG|random\.|GRANT|REVOKE|CREATE POLICY|ROW LEVEL SECURITY|SECURITY DEFINER' -- "$f"; }; then
+      printf '%s\n' "$f"
+    fi
+  done
+fi
 ```
 
+- **`CHANGED_SET=UNKNOWN` printed** → run Steps 2 and 3 on the files the review
+  phases covered, and report `Security review: Triggered (changed set unknown)`.
 - **No file printed** → skip Steps 2 and 3. Report
   `Security review: Skipped (no sensitive files)` and continue.
 - **Files printed** → run Steps 2 and 3 on them, and report
   `Security review: Triggered (<matching files>)`.
-- **`CHANGED_SET = UNKNOWN`** → run Steps 2 and 3 on the files the review
-  phases covered, and report `Security review: Triggered (changed set unknown)`.
 
 ### Step 2: Python-Specific Security Checks
 

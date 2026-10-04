@@ -11,8 +11,11 @@ description: Use when bd in a worktree returns [] or errors, when verifying the 
    `git rev-parse --git-common-dir` from the worktree should resolve to the main repo's
    `.git`.
 2. Confirm the parent's `.beads/metadata.json` shows `"dolt_mode": "embedded"`.
-3. Inspect `.beads/embeddeddolt/` in the MAIN repo: `manifest` and `journal.idx` must
-   exist with non-zero size. Zero-byte or missing is a real corruption signal — a
+3. Inspect the store in the MAIN repo: `manifest` and `journal.idx` live under
+   `.beads/embeddeddolt/<db>/.dolt/noms/` and must exist with non-zero size. From the
+   main repo root,
+   `find .beads/embeddeddolt \( -name manifest -o -name journal.idx \) -size +0 -print`
+   must print both. Zero-byte or missing is a real corruption signal — a
    data-safety event: stop and follow `.claude/rules/critical ai agent rule.md` before
    any further mutation.
 

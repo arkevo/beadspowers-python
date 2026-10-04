@@ -17,12 +17,17 @@ Reading the whole project never widens the write scope. Step 4's auto-fix is
 still limited to the changed set, and is skipped entirely when the changed set is
 unknown (`.claude/rules/verification-write-scope.md`).
 
+`<changed .py/.pyi files>` stands for only the `.py`/`.pyi` files among the files
+chosen above (a directory, such as the `src/ tests/` fallback, goes in as it is)
+— ruff and mypy fail on other files, such as a `README.md` — and when none is
+left, skip this step and say so in the report.
+
 ```bash
 # Lint errors and warnings (read-only)
-ruff check --no-fix <files to analyse>
+ruff check --no-fix <changed .py/.pyi files>
 
 # Type checking (read-only)
-mypy <files to analyse>
+mypy <changed .py/.pyi files>
 ```
 
 ### Step 2: Run Dead Code Analysis
@@ -106,8 +111,8 @@ outside the changed set is reported, not fixed):
    `.claude/Commands/workflow-commands/references/scoped-ruff.md`, unchanged. It formats only the changed set's
    Python files with `ruff format --force-exclude`, re-checks them with
    `ruff format --check`, and reports anything that changed outside the set.
-2. Run a final `ruff check --no-fix --force-exclude` on the files from Step 1 to confirm
-   the lint issues are resolved.
+2. Run a final `ruff check --no-fix --force-exclude` on the `<changed .py/.pyi files>`
+   from Step 1 to confirm the lint issues are resolved.
 3. Re-run `mypy` on the same files to confirm the type errors are resolved.
 4. Optionally re-run `vulture src/` (read-only) to confirm the unused code is gone.
 5. Report a summary of the fixes applied, including the blocks' `Auto-fixed:` and

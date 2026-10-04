@@ -65,12 +65,15 @@ Before reviewing any code:
 
 ### Step 1: Run Static Analysis
 
-Run ruff and mypy on the changed files. Analysis only reads, so when the changed
+Run ruff and mypy on the changed set's Python files. `<changed .py/.pyi files>`
+stands for the changed set's `.py`/`.pyi` files only — ruff and mypy fail on
+anything else, such as a `README.md` — and when it has none, skip every command
+that takes it and say so in the report. Analysis only reads, so when the changed
 set is UNKNOWN, run the same two commands on `src/ tests/` instead:
 
 ```bash
-ruff check --no-fix <changed_files>
-mypy <changed_files>
+ruff check --no-fix <changed .py/.pyi files>
+mypy <changed .py/.pyi files>
 ```
 
 ### Step 2: Categorize Issues
@@ -206,8 +209,8 @@ Exclude from final report:
 
 Run final verification sequence:
 
-1. `ruff check --no-fix <changed_files>` via Bash - Confirm no lint errors
-2. `ruff format --check <changed_files>` via Bash - Ensure consistent formatting
+1. `ruff check --no-fix <changed .py/.pyi files>` via Bash - Confirm no lint errors
+2. `ruff format --check <changed .py/.pyi files>` via Bash - Ensure consistent formatting
 3. `pytest -v` via Bash - Execute all tests
 
 **All must pass before claiming completion.**

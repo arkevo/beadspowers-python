@@ -29,7 +29,7 @@ Beadspowers is a Claude Code workflow for Python projects that combines **Beads*
 
    ```bash
    git switch -c chore/workflow-setup
-   cp -rn /path/to/beadspowers-python/.claude/ .claude/
+   cp -Rn /path/to/beadspowers-python/.claude/. .claude/
    ```
 
 4. Make the hooks executable:
@@ -56,7 +56,7 @@ Beadspowers is a Claude Code workflow for Python projects that combines **Beads*
    grep -rn -e '<owner>/<repo>' -e 'src/<your_package>/' -e '<project>_test' -e '<run-command>' .claude/
    ```
 
-7. Commit the setup and open a PR. Merge it before your first task, because task branches start from the trunk.
+7. Commit the setup and open a PR. Merge it before your first task, because task branches start from the trunk; then update your local trunk: `git switch main && git pull` (use `master` if that is your trunk).
 
    ```bash
    git add .claude .beads/config.yaml .beads/.gitignore
@@ -73,27 +73,31 @@ Beadspowers is a Claude Code workflow for Python projects that combines **Beads*
 2. `/workflow-commands:beads-start-task <task-id>` — Claude announces the lane; in Lane C it asks the refinement questions and the execution choice.
 3. Verification runs automatically after execution.
 4. `/workflow-commands:beads-ship-task` — opens the PR and closes the bead.
-5. Merge the PR.
+5. Merge the PR, then update your local trunk: `git switch main && git pull` (use `master` if that is your trunk).
 6. `/clear`
 
 ## An epic
 
 ![Epic-batch workflow](docs/workflow-process-flow.drawio.png)
 
-1. `git worktree add ../<project>-<epic> -b feat/<epic-slug>`, then `cd ../<project>-<epic> && claude`
-2. `/superpowers:brainstorming` — the approved spec lands in `docs/plans/`.
+1. From the main checkout, after `git switch main && git pull`: `git worktree add ../<project>-<epic> -b feat/<epic-slug>`, then `cd ../<project>-<epic> && claude`
+2. `/superpowers:brainstorming` — the approved spec lands in `docs/plans/`. When it asks you to review the written spec, review it, then go to step 3 instead of approving there: approving makes brainstorming start writing an implementation plan, and the epic's plans come from steps 4–6.
 3. `/clear`
 4. `/workflow-commands:workflow-planning-sequence --spec docs/plans/<date>-<topic>-design.md` — creates the epic; note its id.
 5. `/clear`
 6. `/workflow-commands:workflow-writing-plans <epic-id>`
 7. `/clear`
-8. Only if the epic has spike tasks: `/workflow-commands:workflow-execute-spikes <epic-id>`, then `/clear`, then `/workflow-commands:workflow-writing-plans <epic-id>` again (it plans the tasks the spikes unblocked), then `/clear`.
+8. Only if the epic has spike tasks:
+   1. `/workflow-commands:workflow-execute-spikes <epic-id>`
+   2. `/clear`
+   3. `/workflow-commands:workflow-writing-plans <epic-id>` again — it plans the tasks the spikes unblocked.
+   4. `/clear`
 9. `/workflow-commands:workflow-execution-sequence <epic-id>`
 10. `/clear`
 11. `/workflow-commands:workflow-execute-plans <epic-id>`
 12. `/clear`
 13. `/workflow-commands:workflow-ship-epic <epic-id>` — opens the PR.
-14. Merge the PR.
+14. Merge the PR, then, in the main checkout, update your local trunk: `git switch main && git pull` (use `master` if that is your trunk).
 15. `/workflow-commands:workflow-ship-epic <epic-id>` again — confirms the merge and marks the epic shipped.
 16. `/clear`
 

@@ -127,9 +127,10 @@ before running it — and put `/clear` between phases (*Completion Report*).
 **Batch hard stops.** They live inside the commands; the router restates them:
 
 - **Surface a finished-but-unshipped epic before starting new epic work:** an open
-  epic with every open child `ex:done` but no `sh:shipped`, or a closed epic still at
-  `sh:pushed` (PR opened, not merged). Planning-sequence, writing-plans and
-  execute-plans check at Step 0 and surface-and-ask (`surface-unshipped-epics.md`).
+  epic with at least one `ex:done` child, every open child `ex:done` and no `sh:*`
+  label, or an epic still at `sh:pushed` (PR opened, not merged). Planning-sequence,
+  writing-plans and execute-plans check at Step 0 and surface-and-ask
+  (`surface-unshipped-epics.md`).
 - **Budget gate before every fan-out.** No `Workflow` run starts before its preview and
   confirm: cost as a % of the 5-hr usage limit, never the model tier
   (`never-ask-about-agent-model.md`), plus the temporary worktree branches it creates.
@@ -527,7 +528,7 @@ When a task closes or a batch command finishes, end the turn with, unprompted:
 
 Run a mandated next step first — `workflow-commands:beads-post-execution` after
 execution, `workflow-commands:plan-summary-console` after refinement — then the report.
-Skip only on an explicit "skip summary" or "just execute".
+Skip the plan summary only on an explicit "skip summary" or "just execute".
 
 ### Epic Status Table — always the WHOLE epic
 

@@ -43,9 +43,11 @@ At the START of `/workflow-commands:workflow-planning-sequence`,
 (`bd list --type=epic --all -n 0 --json`) and look for either of two states.
 Surface the first one found before doing anything else:
 
-- **Finished, never shipped** — an open epic whose open children are all
-  `ex:done` (`bd list --parent <id> -n 0 --json`) and which carries no `sh:*`
-  label: `/workflow-commands:workflow-ship-epic` never ran.
+- **Finished, never shipped** — an open epic with at least one `ex:done` child,
+  whose open children are all `ex:done` (`bd list --parent <id> -n 0 --json`),
+  and which carries no `sh:*` label: `/workflow-commands:workflow-ship-epic`
+  never ran. An epic with no children, or whose children are all closed and none
+  `ex:done`, does not match.
 
   > ⚠️ Epic **<id> "<title>"** finished executing on <date> but was never
   > shipped — all N open children are `ex:done`, the epic has no `sh:shipped`,
@@ -54,9 +56,10 @@ Surface the first one found before doing anything else:
   > Ship it with `/workflow-commands:workflow-ship-epic <id>` first, or tell me
   > to proceed and stack this new work on top of it.
 
-- **PR opened, not merged** — a closed epic that carries `sh:pushed` but not
-  `sh:shipped`. Ship-epic closes the tasks and the epic when it opens the PR,
-  so a closed epic proves only that the PR was opened. `<date>` is the
+- **PR opened, not merged** — an epic that carries `sh:pushed` but not
+  `sh:shipped`, open or closed. It is usually closed: ship-epic closes the tasks
+  and the epic when it opens the PR, so a closed epic proves only that the PR
+  was opened, and an open one means a ship stopped in between. `<date>` is the
   `opened:` date in the `PR: <pr-url> · head: <epic-head-sha> · opened: <date>`
   line ship-epic appends to the epic's notes.
 
