@@ -143,8 +143,13 @@ def test_writes_file(tmp_path: Path) -> None:
 ```
 
 ### Phase 8: Verify with Python Tools
-1. `ruff check tests/` — check for lint errors
-2. `ruff format tests/` — apply formatting
+1. `ruff check --no-fix tests/` — check for lint errors
+2. Apply formatting with the `scoped-ruff-format` block in
+   `.claude/Commands/workflow-commands/references/scoped-ruff.md`, after adding the test
+   file you wrote to `modified_files` in `.beads/.session-state.json` (read the file,
+   extend that one list, write it back). The block formats only the changed set —
+   never a bare `ruff format tests/`, which rewrites every test file
+   (`.claude/rules/verification-write-scope.md`).
 3. `pytest -v` — execute tests and confirm RED (failing) before GREEN
 
 ## Test Organization

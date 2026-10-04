@@ -355,7 +355,7 @@ Per the project's documentation standards:
 
 After analysis, verify findings by:
 
-1. **Check for lint warnings**: `ruff check .` — missing docstrings appear as D-series warnings
+1. **Check for lint warnings**: `ruff check --no-fix .` — missing docstrings appear as D-series warnings
 2. **Cross-reference type hints**: Documented types should match `-> ReturnType` annotations
 3. **Grep for stale references**: Search for removed parameter names in docstrings
 

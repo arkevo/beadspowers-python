@@ -151,7 +151,7 @@ def test_validate_amount_raises_when_invalid(amount, expected_error):
    - `src/services/auth.py` → `tests/services/test_auth.py`
 4. **Analyze Coverage**: Check if new/modified code has corresponding tests
 5. **Evaluate Test Quality**: Review test implementations for best practices
-6. **Verify**: Run `pytest -v` and `ruff check tests/` to ensure tests pass and are lint-clean
+6. **Verify**: Run `pytest -v` and `ruff check --no-fix tests/` to ensure tests pass and are lint-clean
 
 ---
 
@@ -286,7 +286,7 @@ tests/
 After analysis, verify:
 
 1. **Run existing tests**: `pytest -v` to ensure current tests pass
-2. **Check for lint errors in tests**: `ruff check tests/` to catch obvious issues
+2. **Check for lint errors in tests**: `ruff check --no-fix tests/` to catch obvious issues
 3. **Format check**: `ruff format --check tests/` to ensure consistent formatting
 
 ---
