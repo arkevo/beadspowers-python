@@ -68,5 +68,7 @@ Report what they print in the verification report:
 
 - `Auto-fixed: N across M changed files` (N from ruff's own summary), or
   `Auto-fixed: SKIPPED (changed set unknown)`, or
-  `Auto-fixed: SKIPPED (no Python files in the changed set)`;
+  `Auto-fixed: SKIPPED (no Python files in the changed set)`, or
+  `Auto-fixed: FAILED (<ruff call> exited <code>)` when ruff itself failed, which
+  the report carries as a failed lint phase, never as a pass;
 - `Scope check: no files outside the changed set`, or `Scope check: LEAK: [list]`.

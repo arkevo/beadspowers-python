@@ -196,6 +196,8 @@ if [ -z "$changed" ]; then
   echo "PHASE6_GATE=launch (changed set unknown)"
 elif [ -z "$trunk" ]; then
   echo "PHASE6_GATE=launch (no origin/HEAD, so committed changes cannot be checked)"
+elif ! git merge-base "$trunk" HEAD >/dev/null 2>&1; then
+  echo "PHASE6_GATE=launch (no merge base with $trunk, as in a shallow clone, so committed changes cannot be checked)"
 else
   src_files=()
   while IFS= read -r f; do
@@ -237,9 +239,9 @@ or `NamedTuple` call. It reads every tree state: commits on this branch
 (`<trunk>...HEAD`), staged and unstaged edits (against `HEAD`), and untracked
 files. Comments, import lines and test classes (`class Test…`, and anything
 under `tests/` or named `test_*.py`, `*_test.py` or `conftest.py`) don't count.
-When the changed set is unknown, or there is no `origin/HEAD` to diff committed
-work against, it launches the agent anyway, because it cannot rule out a new
-type.
+When the changed set is unknown, or there is no `origin/HEAD` (or no merge base
+with it, as in a shallow clone) to diff committed work against, it launches the
+agent anyway, because it cannot rule out a new type.
 
 ### Step 1: Identify Types to Analyze
 From Phase 1 changed files, identify:
@@ -854,7 +856,7 @@ Found [N] issues before completion.
 
 ### Lint Fixes Applied (P02-lint-issues-fix)
 - Auto-fixed: [N] issues across [M] changed files
-  *(or:* `SKIPPED (changed set unknown)` *)*
+  *(or:* `SKIPPED (changed set unknown)` *or* `SKIPPED (no Python files in the changed set)` *or* `FAILED (<ruff call> exited <code>)`, a failed lint phase *)*
 - Scope check: no files outside the changed set changed
   *(or:* **LEAK: [list]** *, with what was reverted and what was only reported)*
 - Manual fixes needed: [N] issues

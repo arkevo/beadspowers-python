@@ -125,7 +125,7 @@ Ran lint + tests on [N] changed files ([M] lines total).
 
 ### Lint Results
 **Auto-fixed:** [N] issues across [M] changed files
-*(or:* `SKIPPED (changed set unknown)` *or* `SKIPPED (no Python files in the changed set)` *)*
+*(or:* `SKIPPED (changed set unknown)` *or* `SKIPPED (no Python files in the changed set)` *or* `FAILED (<ruff call> exited <code>)`, a failed lint phase *)*
 **Scope check:** no files outside the changed set / **LEAK: [list]**
 **Remaining:** [N] issues
 - `file:line` - [issue description]

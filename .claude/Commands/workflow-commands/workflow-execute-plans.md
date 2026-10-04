@@ -640,7 +640,8 @@ table:
 - no open child is still deferred (`wp:deferred` with no later `wp:approved`),
   unplanned (no `wp:*` label), or not started (no `ex:*` or `sk:*` label);
 - no attended or ops child is open — a migration apply, a cloud-console step, a
-  release gate.
+  release gate. An implementation task that ran in attended mode is not one of
+  these: once it is `ex:done`, the first bullet covers it.
 
 When anything is left, name the step that finishes it instead:
 

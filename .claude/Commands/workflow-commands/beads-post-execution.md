@@ -98,10 +98,15 @@ new_modules = sorted(p for p in added | untracked if p.startswith("src/") and p.
 state_path = Path(".beads/.session-state.json")
 try:
     state = json.loads(state_path.read_text())
-except (OSError, ValueError):
+except FileNotFoundError:
     state = {}
+except ValueError as exc:
+    raise SystemExit(f"Changed set: NOT recorded - {state_path} is not valid JSON ({exc}). "
+                     "Fix the file, or delete it to start over, then re-run this block; "
+                     "overwriting it would drop task_id, plan_file and the other keys.")
 if not isinstance(state, dict):
-    state = {}
+    raise SystemExit(f"Changed set: NOT recorded - {state_path} does not hold a JSON object. "
+                     "Fix the file, or delete it to start over, then re-run this block.")
 state["modified_files"] = files
 state["total_lines_changed"] = lines
 state_path.parent.mkdir(exist_ok=True)

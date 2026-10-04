@@ -4,15 +4,16 @@
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
-# Define dangerous patterns (includes both rm and trash since rm→trash conversion happens first)
+# Define dangerous patterns. The trash forms cover setups that rewrite rm into
+# trash; this repo ships no such rewrite.
 DANGEROUS_PATTERNS=(
     "rm -rf /"
     "rm -rf ~"
-    "rm -rf \$HOME"
+    'rm -rf \$HOME'
     "rm -rf \*"
     "trash /"
     "trash ~"
-    "trash \$HOME"
+    'trash \$HOME'
     "trash \*"
     "> /dev/sd"
     "mkfs"
@@ -31,7 +32,8 @@ DANGEROUS_PATTERNS=(
     "pip upload"
 )
 
-# Check each pattern - BLOCK dangerous commands outright
+# Check each pattern. A match returns an "ask" decision: the command is not
+# blocked, but the user must confirm it before it runs.
 for pattern in "${DANGEROUS_PATTERNS[@]}"; do
     if echo "$COMMAND" | grep -qE "$pattern"; then
         jq -n --arg reason "⚠️ Dangerous command detected ($pattern). Are you sure?" '{
@@ -49,8 +51,11 @@ done
 # that chains (; & && ||), pipes (|), substitutes ($( ) or backticks, <( ) >( )),
 # redirects output (>), or spans lines can hide a second action behind an allowed
 # first word, so it gets no auto-allow and falls through to the normal prompt.
+# Any "(" also disqualifies it: the Bash tool runs the user's shell (zsh on
+# macOS), where =(cmd) and glob qualifiers such as *(e:'cmd':) or *(+fn) run
+# code without any of the characters above.
 case "$COMMAND" in
-    *$'\n'*|*$'\r'*|*';'*|*'&'*|*'|'*|*'`'*|*'$('*|*'<('*|*'>'*)
+    *$'\n'*|*$'\r'*|*';'*|*'&'*|*'|'*|*'`'*|*'('*|*'>'*)
         exit 0
         ;;
 esac

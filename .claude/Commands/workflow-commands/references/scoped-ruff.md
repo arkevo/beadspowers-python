@@ -57,12 +57,12 @@ if notebooks:  # report only: lint or check, never write
 if not files:
     print("Auto-fixed: SKIPPED (no Python files in the changed set)")
     sys.exit(0)
-if MODE == "fix":
-    subprocess.run(["ruff", "check", "--diff", "--force-exclude", "--", *files])
-    subprocess.run(["ruff", "check", "--fix", "--force-exclude", "--", *files])
-else:
-    subprocess.run(["ruff", "format", "--force-exclude", "--", *files])
-    subprocess.run(["ruff", "format", "--check", "--force-exclude", "--", *files])
+runs = [["check", "--diff"], ["check", "--fix"]] if MODE == "fix" else [["format"], ["format", "--check"]]
+failed = []
+for args in runs:
+    rc = subprocess.run(["ruff", *args, "--force-exclude", "--", *files]).returncode
+    if rc >= 2:  # 1 means findings remain or files would change; 2 means ruff itself failed
+        failed.append(f"ruff {' '.join(args)} exited {rc}")
 
 leaks = []
 for path, xy in status().items():
@@ -76,9 +76,13 @@ for path, xy in status().items():
             leaks.append(f"{path} (reverted)")
     elif digest(path) != hashes.get(path):
         leaks.append(f"{path} (had uncommitted edits before; NOT reverted, review it)")
-print(f"Auto-fix ran on {len(files)} changed file(s).")
+if failed:
+    print("Auto-fixed: FAILED (" + "; ".join(failed) + ") - read ruff's error above; the fix did not complete")
+else:
+    print(f"Auto-fix ran on {len(files)} changed file(s).")
 print("Scope check: no files outside the changed set" if not leaks
       else "Scope check: LEAK: " + "; ".join(leaks))
+sys.exit(1 if failed else 0)
 PY
 ```
 
@@ -133,12 +137,12 @@ if notebooks:  # report only: lint or check, never write
 if not files:
     print("Auto-fixed: SKIPPED (no Python files in the changed set)")
     sys.exit(0)
-if MODE == "fix":
-    subprocess.run(["ruff", "check", "--diff", "--force-exclude", "--", *files])
-    subprocess.run(["ruff", "check", "--fix", "--force-exclude", "--", *files])
-else:
-    subprocess.run(["ruff", "format", "--force-exclude", "--", *files])
-    subprocess.run(["ruff", "format", "--check", "--force-exclude", "--", *files])
+runs = [["check", "--diff"], ["check", "--fix"]] if MODE == "fix" else [["format"], ["format", "--check"]]
+failed = []
+for args in runs:
+    rc = subprocess.run(["ruff", *args, "--force-exclude", "--", *files]).returncode
+    if rc >= 2:  # 1 means findings remain or files would change; 2 means ruff itself failed
+        failed.append(f"ruff {' '.join(args)} exited {rc}")
 
 leaks = []
 for path, xy in status().items():
@@ -152,8 +156,12 @@ for path, xy in status().items():
             leaks.append(f"{path} (reverted)")
     elif digest(path) != hashes.get(path):
         leaks.append(f"{path} (had uncommitted edits before; NOT reverted, review it)")
-print(f"Auto-fix ran on {len(files)} changed file(s).")
+if failed:
+    print("Auto-fixed: FAILED (" + "; ".join(failed) + ") - read ruff's error above; the fix did not complete")
+else:
+    print(f"Auto-fix ran on {len(files)} changed file(s).")
 print("Scope check: no files outside the changed set" if not leaks
       else "Scope check: LEAK: " + "; ".join(leaks))
+sys.exit(1 if failed else 0)
 PY
 ```

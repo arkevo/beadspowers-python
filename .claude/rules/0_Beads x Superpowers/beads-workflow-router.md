@@ -159,8 +159,10 @@ in the epic is left. "Left" means any open child that is not `ex:done`, any open
 "Smoke gate:" bead, any `wp:deferred`, unplanned or unstarted child, and any open
 attended or ops child (a migration apply, a cloud console step, a release gate).
 Only open children count: a closed spike or a closed bug is not left, and
-`wp:deferred` no longer counts once a later `wp:approved` outranks it. Read
-these from `bd list` in the same turn.
+`wp:deferred` no longer counts once a later `wp:approved` outranks it. An
+implementation task that ran in attended mode is not an attended or ops child:
+once it is `ex:done`, it counts as finished. Read these from `bd list` in the
+same turn.
 
 Recommend the step that finishes the remaining work instead. A smoke that needs the
 epic's code running somewhere — a staging service, a preview environment — is finished

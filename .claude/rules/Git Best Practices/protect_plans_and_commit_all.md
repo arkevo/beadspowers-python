@@ -55,7 +55,7 @@ files you didn't intend to remove. Instead:
 
 1. **Stage explicitly:** add files by name, directory, or pattern
    ```bash
-   git add lib/ test/ .claude/ pipeline/  # known change directories
+   git add src/ tests/ docs/ .claude/     # known change directories
    git add <specific-new-files>           # untracked files
    ```
 2. **Review before committing:**
