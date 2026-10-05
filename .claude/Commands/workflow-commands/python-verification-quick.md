@@ -54,8 +54,9 @@ mypy <changed .py/.pyi files>
 
 Never auto-fix outside the task's changed set. Run the `scoped-ruff-fix` block
 from `.claude/Commands/workflow-commands/references/scoped-ruff.md`, unchanged (policy:
-`.claude/rules/verification-write-scope.md`). In short, it reads the changed set; skips without calling ruff when the
-set is UNKNOWN or holds no Python files; previews with `ruff check --diff`, a dry
+`.claude/rules/verification-write-scope.md`). In short, it reads the changed set; skips every write when the
+set is UNKNOWN or holds no Python files (a changed notebook is still linted,
+read-only); previews with `ruff check --diff`, a dry
 run that writes nothing; applies `ruff check --fix --force-exclude` to the changed
 Python files only (`--force-exclude` keeps ruff's own exclude list in force for
 files named on the command line); and then compares `git status` with its
@@ -105,7 +106,9 @@ pytest -v
 ## Phase 12: Write Verification Marker (ONLY on PASS)
 
 The router's *Verification Before Ship / "Done"* and `workflow-commands:beads-ship-task`
-gate on this marker. Write it ONLY after tests pass — never on failure:
+gate on this marker. Write it ONLY after tests pass and Phase 2 did not print
+`Auto-fixed: FAILED` (ruff itself failed, so nothing was linted) — never on
+failure:
 
 ```bash
 TASK=$(python3 -c "import json;print(json.load(open('.beads/.session-state.json')).get('task_id',''))" 2>/dev/null)

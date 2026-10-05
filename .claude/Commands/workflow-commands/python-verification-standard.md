@@ -89,8 +89,9 @@ mypy <changed .py/.pyi files>
 Never auto-fix outside the task's changed set. Run the `scoped-ruff-fix` block
 from `.claude/Commands/workflow-commands/references/scoped-ruff.md`, unchanged (policy:
 `.claude/rules/verification-write-scope.md`) — never a bare `ruff check --fix`, which rewrites every file it can
-reach. In short, the block reads the changed set; skips without calling ruff when
-the set is UNKNOWN or holds no Python files; previews with `ruff check --diff`;
+reach. In short, the block reads the changed set; skips every write when
+the set is UNKNOWN or holds no Python files (a changed notebook is still linted,
+read-only); previews with `ruff check --diff`;
 applies `ruff check --fix --force-exclude` to the changed Python files only; and
 compares `git status` with its snapshot, reporting any file outside the set that
 changed — never reverting it — and exiting 1 so it is inspected.

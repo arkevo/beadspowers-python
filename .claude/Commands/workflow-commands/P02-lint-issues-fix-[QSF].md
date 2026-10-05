@@ -7,8 +7,12 @@ Analysis only reads, so it may look wide; what it may *write* is decided in
 Step 4. Choose the files to analyse in this order:
 
 1. the path given as the argument above, if there is one. It becomes the changed
-   set: write it into `modified_files` as `.claude/rules/verification-write-scope.md`
-   describes, so Step 4 fixes exactly those files;
+   set for this run only: note the current `modified_files` value (an empty list
+   if there is none), then write the argument into `modified_files` as
+   `.claude/rules/verification-write-scope.md` describes, so Step 4 fixes exactly
+   those files. Step 6 puts the noted value back: a later `python-verification-*`
+   run reads `modified_files` without re-deriving it, so a leftover argument would
+   narrow its lint, auto-fix and security gate to this path alone;
 2. otherwise the task's changed set, `modified_files` in
    `.beads/.session-state.json`;
 3. otherwise, as a last resort, the whole project (`src/ tests/`).
@@ -77,8 +81,8 @@ implements is `.claude/rules/verification-write-scope.md`). In short, it:
 - reads the changed set and keeps only the Python files that are safe to rewrite
   (nothing under `.venv/`, `vendor/`, `third_party/` or `migrations/`, no
   generated `*_pb2.py`; notebooks are linted but never rewritten);
-- skips entirely, without calling ruff, when the changed set is unknown or holds
-  no Python files — it never widens to the project root;
+- skips every write when the changed set is unknown or holds no Python files (a
+  changed notebook is still linted, read-only) — it never widens to the project root;
 - previews with `ruff check --diff`, applies `ruff check --fix --force-exclude` to
   those files only, then compares `git status` with its snapshot: any file outside
   the set that changed is reported, never reverted, and the block exits 1 so it is
@@ -118,6 +122,9 @@ outside the changed set is reported, not fixed):
 4. Optionally re-run `vulture src/` (read-only) to confirm the unused code is gone.
 5. Report a summary of the fixes applied, including the blocks' `Auto-fixed:` and
    `Scope check:` lines.
+6. If Step 1 wrote the argument into `modified_files`, put back the value it
+   noted there (read the file, change that one key, write it back) and say so in
+   the summary.
 
 ## Priority Guidelines
 1. Fix ruff errors first (E-codes and F-codes — blocking or critical issues)

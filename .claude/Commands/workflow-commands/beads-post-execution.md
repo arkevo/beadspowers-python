@@ -39,7 +39,11 @@ file. The trunk is whatever `origin/HEAD` points at, normally `origin/main` or
 `origin/master`; when that is unset or dangling, the block asks git to set it
 once. When the repository has no `origin` at all, the branch's own commits
 cannot be measured, so the block records the uncommitted and untracked files and
-says the branch range was skipped.
+says the branch range was skipped. When the trunk exists but HEAD shares no
+history with it — a shallow clone, or an unrelated branch — the block records
+nothing and exits 1, telling you to fetch the missing history: recording only the
+uncommitted files would quietly drop the branch's commits from the level choice
+and from every review phase.
 
 Run the block from anywhere inside the repository. It rewrites only
 `modified_files` (a plain list of path strings) and `total_lines_changed`, and
@@ -56,6 +60,10 @@ if [ -z "$trunk" ] || ! git rev-parse -q --verify "$trunk^{commit}" >/dev/null 2
 fi
 base=""
 [ -n "$trunk" ] && base=$(git merge-base "$trunk" HEAD 2>/dev/null)
+if [ -n "$trunk" ] && [ -z "$base" ]; then
+  echo "Changed set: NOT recorded - HEAD shares no history with $trunk (a shallow clone, or an unrelated branch), so the branch's own commits cannot be measured. Fetch the missing history (git fetch --unshallow, or git fetch --deepen=<n>) and re-run this block."
+  exit 1
+fi
 if [ -z "$base" ]; then
   echo "Changed set: branch range skipped (no trunk to compare with) - uncommitted and untracked files only."
   base=$(git rev-parse -q --verify HEAD || git hash-object -t tree /dev/null)
@@ -229,7 +237,7 @@ echo "Smoke Test" > .beads/.workflow-step
 
 When user confirms app works → stop app → proceed to `workflow-commands:beads-ship-task`.
 
-If user finds an issue → stop app → fix → re-run verification (at least quick) → offer smoke test again.
+If user finds an issue → stop app → fix → re-record the changed set with Step 2a's block (no verification skill re-derives it, so a file the fix touched would otherwise go unchecked) → re-run verification (at least quick) → offer smoke test again.
 
 ---
 

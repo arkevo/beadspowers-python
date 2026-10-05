@@ -21,7 +21,10 @@ in `[tool.ruff]`, and a bare `ruff check` then rewrites files.
   block runs, write such a list into `modified_files` — read the file, change that
   one key, write it back, as `workflow-commands:beads-post-execution` Step 2b does
   — with a named directory standing for the files under it
-  (`git ls-files --cached --others --exclude-standard -- <dir>`). An answer to
+  (`git ls-files --cached --others --exclude-standard -- <dir>`). Write each path
+  relative to the repository root, the way `git status` prints it (no leading `./`,
+  never absolute): the blocks match paths against `git status` exactly, so
+  `./src/a.py` makes them report their own fix of `src/a.py` as a LEAK. An answer to
   "which files should I look at?" only steers reading; it never becomes the
   changed set.
 - **Never auto-fixed, even inside the changed set:** anything under `.venv/`,
@@ -63,21 +66,27 @@ are safe to rewrite, and never calls ruff with an empty file list
    session) — and the block exits 1 so the leak is inspected before anything else
    happens. That covers a tracked file that was clean before, an untracked file
    that appeared, and a file that already had uncommitted edits and changed again.
+   The check skips only the Python files the block rewrites, so a changed-set file
+   it leaves alone, such as a `README.md` or a notebook, is reported the same way.
 
 Report what they print in the verification report:
 
-- `Auto-fixed: N across M changed files` (N from ruff's own summary), or
+- `Auto-fixed: N across M changed files` (on success the block itself prints
+  `Auto-fix ran on M changed file(s).`; take N from ruff's own summary above it), or
   `Auto-fixed: SKIPPED (changed set unknown)`, or
   `Auto-fixed: SKIPPED (no Python files in the changed set)`, or
   `Auto-fixed: FAILED (<ruff call> exited <code>)` when ruff itself failed, which
   the report carries as a failed lint phase, never as a pass;
 - `Scope check: no files outside the changed set`, or `Scope check: LEAK: [list]`,
   which stops the step until each listed file is inspected; nothing on the list was
-  reverted.
+  reverted. A run that writes nothing — a skipped run, or one that failed on a
+  notebook before any write — prints no `Scope check:` line.
 
-To inspect a leak, read `git diff -- <path>` (or the new file) for each listed
+To inspect a leak, read `git diff HEAD -- <path>` (or the new file) for each listed
 path, leave the file as it is, and name it in the report with what changed. A LEAK
 on its own is not a failed phase and does not withhold the verification marker,
 but the owner must see it before shipping: "ship it" stages every changed file
 (`Git Best Practices/protect_plans_and_commit_all.md` Rule 3), so the file ships
-with the task unless the owner commits or stashes it first.
+with the task unless the owner stashes it first. Committing it separately only gives
+it its own commit message: it stays on the branch, so it still goes out in the
+task's PR.

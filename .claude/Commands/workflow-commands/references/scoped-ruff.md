@@ -10,7 +10,9 @@ it to `modified_files` first — never pass a file list. The two blocks differ o
 their `# snippet:` and `SCOPED_RUFF_MODE=` lines; keep them identical otherwise.
 Each block exits 0 after a clean or skipped run. Any other exit means stop and read
 what it printed: `Auto-fixed: FAILED` (ruff itself failed), `Scope check: LEAK:`
-(a file outside the set changed during the run), or an error from git or Python.
+(a file the block did not rewrite changed during the run: usually one outside the
+set, but a file in the set that the block skips, such as a `README.md`, counts too),
+or an error from git or Python.
 
 ## Lint auto-fix
 
@@ -54,17 +56,22 @@ notebooks = [p for p in changed if p.endswith(".ipynb") and Path(p).is_file()]
 
 before = status()
 hashes = {p: digest(p) for p in before if p not in files}
+failed = []
 if notebooks:  # report only: lint or check, never write
     check = ["check", "--no-fix"] if MODE == "fix" else ["format", "--check"]
-    subprocess.run(["ruff", *check, "--force-exclude", "--", *notebooks])
+    rc = subprocess.run(["ruff", *check, "--force-exclude", "--", *notebooks]).returncode
+    if rc < 0 or rc >= 2:  # 1: findings or diffs; 2: ruff failed; below 0: a signal killed it
+        failed.append(f"ruff {' '.join(check)} on notebooks exited {rc}")
 if not files:
+    if failed:
+        print("Auto-fixed: FAILED (" + "; ".join(failed) + ") - read ruff's error above")
+        sys.exit(1)
     print("Auto-fixed: SKIPPED (no Python files in the changed set)")
     sys.exit(0)
 runs = [["check", "--diff"], ["check", "--fix"]] if MODE == "fix" else [["format"], ["format", "--check"]]
-failed = []
 for args in runs:
     rc = subprocess.run(["ruff", *args, "--force-exclude", "--", *files]).returncode
-    if rc >= 2:  # 1 means findings remain or files would change; 2 means ruff itself failed
+    if rc < 0 or rc >= 2:  # 1: findings remain or files would change; 2: ruff failed; below 0: a signal killed it
         failed.append(f"ruff {' '.join(args)} exited {rc}")
 
 leaks = []
@@ -133,17 +140,22 @@ notebooks = [p for p in changed if p.endswith(".ipynb") and Path(p).is_file()]
 
 before = status()
 hashes = {p: digest(p) for p in before if p not in files}
+failed = []
 if notebooks:  # report only: lint or check, never write
     check = ["check", "--no-fix"] if MODE == "fix" else ["format", "--check"]
-    subprocess.run(["ruff", *check, "--force-exclude", "--", *notebooks])
+    rc = subprocess.run(["ruff", *check, "--force-exclude", "--", *notebooks]).returncode
+    if rc < 0 or rc >= 2:  # 1: findings or diffs; 2: ruff failed; below 0: a signal killed it
+        failed.append(f"ruff {' '.join(check)} on notebooks exited {rc}")
 if not files:
+    if failed:
+        print("Auto-fixed: FAILED (" + "; ".join(failed) + ") - read ruff's error above")
+        sys.exit(1)
     print("Auto-fixed: SKIPPED (no Python files in the changed set)")
     sys.exit(0)
 runs = [["check", "--diff"], ["check", "--fix"]] if MODE == "fix" else [["format"], ["format", "--check"]]
-failed = []
 for args in runs:
     rc = subprocess.run(["ruff", *args, "--force-exclude", "--", *files]).returncode
-    if rc >= 2:  # 1 means findings remain or files would change; 2 means ruff itself failed
+    if rc < 0 or rc >= 2:  # 1: findings remain or files would change; 2: ruff failed; below 0: a signal killed it
         failed.append(f"ruff {' '.join(args)} exited {rc}")
 
 leaks = []

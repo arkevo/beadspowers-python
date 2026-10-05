@@ -95,7 +95,8 @@ The binding rule is `.claude/rules/verification-write-scope.md`, which is
 always loaded; follow it exactly. Run the `scoped-ruff-fix` block from
 `.claude/Commands/workflow-commands/references/scoped-ruff.md`, unchanged: it reads the changed
 set itself, drops deleted files and the paths the rule never auto-fixes, and
-skips without calling ruff when nothing is left. In short:
+skips every write when nothing is left (a changed notebook is still linted,
+read-only). In short:
 
 1. Snapshot `git status --short`.
 2. Preview with `ruff check --diff --force-exclude <files>`, which writes
@@ -484,7 +485,11 @@ done
 ```
 
 Each launch prints `… started in the background as <jobId>. …`. Keep every
-job id: results are collected by id.
+job id: results are collected by id. Some companion versions (1.0.6, for one)
+accept `--background` for reviews but run them in the foreground: the launch then
+prints the whole review and no job id. Find each id with
+`node "$COMPANION" status --json`, which lists `running[]`, `latestFinished` and
+`recent[]` with each job's `id`, `kind` and `createdAt`.
 
 ### Collecting Results
 
@@ -714,7 +719,10 @@ findings) or no edits were applied, skip directly to Phase 14.
 
 Collect all `proposed_edits` from the Phase 12 agent response:
 1. Group by file to detect conflicts with existing code
-2. Apply edits using the Edit tool
+2. Apply edits using the Edit tool, to files inside the changed set only, plus
+   any new test file the rule lets Phase 12 create (step 3). List every other
+   edit in the Phase 13 report instead of applying it (Scope Control, Write
+   scope).
 3. First add every test file Phase 12 created to `modified_files` in
    `.beads/.session-state.json` (read the file, extend that one list, write it
    back): the rule lets Phase 12 create mirrored tests, and from then on they
@@ -857,7 +865,7 @@ Found [N] issues before completion.
 ### Lint Fixes Applied (P02-lint-issues-fix)
 - Auto-fixed: [N] issues across [M] changed files
   *(or:* `SKIPPED (changed set unknown)` *or* `SKIPPED (no Python files in the changed set)` *or* `FAILED (<ruff call> exited <code>)`, a failed lint phase *)*
-- Scope check: no files outside the changed set changed
+- Scope check: no files outside the changed set
   *(or:* **LEAK: [list]** *— each reported, none reverted; inspect them before continuing)*
 - Manual fixes needed: [N] issues
   - `file:line` - [description]
