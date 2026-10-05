@@ -58,11 +58,11 @@ are safe to rewrite, and never calls ruff with an empty file list
 3. writes, with `--force-exclude`, because ruff ignores the project's own
    `exclude` settings for files named on the command line unless that flag is set;
 4. compares `git status` with the snapshot. Any file outside the changed set that
-   changed during the run is reported and never reverted — it may be an edit that
-   you or another agent made while the block ran — and the block exits non-zero so
-   the leak is inspected before anything else happens. That covers a tracked file
-   that was clean before, an untracked file that appeared, and a file that already
-   had uncommitted edits and changed again.
+   changed during the run is reported and never reverted — it may be someone
+   else's edit made while the block ran (the owner's editor, another agent or
+   session) — and the block exits 1 so the leak is inspected before anything else
+   happens. That covers a tracked file that was clean before, an untracked file
+   that appeared, and a file that already had uncommitted edits and changed again.
 
 Report what they print in the verification report:
 
@@ -74,3 +74,10 @@ Report what they print in the verification report:
 - `Scope check: no files outside the changed set`, or `Scope check: LEAK: [list]`,
   which stops the step until each listed file is inspected; nothing on the list was
   reverted.
+
+To inspect a leak, read `git diff -- <path>` (or the new file) for each listed
+path, leave the file as it is, and name it in the report with what changed. A LEAK
+on its own is not a failed phase and does not withhold the verification marker,
+but the owner must see it before shipping: "ship it" stages every changed file
+(`Git Best Practices/protect_plans_and_commit_all.md` Rule 3), so the file ships
+with the task unless the owner commits or stashes it first.

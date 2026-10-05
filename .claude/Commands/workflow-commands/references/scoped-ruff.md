@@ -7,7 +7,10 @@ and 12.5). Run a block exactly as written, from anywhere inside the repository.
 Each block reads the changed set (`modified_files` in `.beads/.session-state.json`)
 itself; to cover a file the task added later, such as a test Phase 12 created, add
 it to `modified_files` first — never pass a file list. The two blocks differ only in
-their `SCOPED_RUFF_MODE=` line; keep them identical otherwise.
+their `# snippet:` and `SCOPED_RUFF_MODE=` lines; keep them identical otherwise.
+Each block exits 0 after a clean or skipped run. Any other exit means stop and read
+what it printed: `Auto-fixed: FAILED` (ruff itself failed), `Scope check: LEAK:`
+(a file outside the set changed during the run), or an error from git or Python.
 
 ## Lint auto-fix
 
