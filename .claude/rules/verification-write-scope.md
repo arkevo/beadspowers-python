@@ -57,12 +57,12 @@ are safe to rewrite, and never calls ruff with an empty file list
    block only);
 3. writes, with `--force-exclude`, because ruff ignores the project's own
    `exclude` settings for files named on the command line unless that flag is set;
-4. compares `git status` with the snapshot. A tracked file outside the changed set
-   that changed was clean before, so it is restored with
-   `git checkout HEAD -- <path>` (nothing is lost) and reported. An untracked file
-   that appeared is reported and left for the user to decide about. A file outside
-   the set that already had uncommitted edits and changed again is reported, never
-   reverted.
+4. compares `git status` with the snapshot. Any file outside the changed set that
+   changed during the run is reported and never reverted — it may be an edit that
+   you or another agent made while the block ran — and the block exits non-zero so
+   the leak is inspected before anything else happens. That covers a tracked file
+   that was clean before, an untracked file that appeared, and a file that already
+   had uncommitted edits and changed again.
 
 Report what they print in the verification report:
 
@@ -71,4 +71,6 @@ Report what they print in the verification report:
   `Auto-fixed: SKIPPED (no Python files in the changed set)`, or
   `Auto-fixed: FAILED (<ruff call> exited <code>)` when ruff itself failed, which
   the report carries as a failed lint phase, never as a pass;
-- `Scope check: no files outside the changed set`, or `Scope check: LEAK: [list]`.
+- `Scope check: no files outside the changed set`, or `Scope check: LEAK: [list]`,
+  which stops the step until each listed file is inspected; nothing on the list was
+  reverted.

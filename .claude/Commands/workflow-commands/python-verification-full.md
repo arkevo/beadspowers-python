@@ -101,10 +101,10 @@ skips without calling ruff when nothing is left. In short:
 2. Preview with `ruff check --diff --force-exclude <files>`, which writes
    nothing.
 3. Fix with `ruff check --fix --force-exclude <files>`.
-4. Compare `git status --short` with the snapshot. A tracked file outside the
-   changed set that moved is reverted with `git checkout HEAD -- <path>` and
-   reported; an untracked file that appeared is reported, never deleted
-   without approval.
+4. Compare `git status --short` with the snapshot. Any file outside the changed
+   set that moved is reported and never reverted (it may be someone else's edit
+   made during the run), and the block exits non-zero so it is inspected; an
+   untracked file that appeared is never deleted without approval.
 
 `--force-exclude` is required because ruff ignores its own `exclude` settings
 for files named on the command line. Never run ruff with an empty file list: a
@@ -858,7 +858,7 @@ Found [N] issues before completion.
 - Auto-fixed: [N] issues across [M] changed files
   *(or:* `SKIPPED (changed set unknown)` *or* `SKIPPED (no Python files in the changed set)` *or* `FAILED (<ruff call> exited <code>)`, a failed lint phase *)*
 - Scope check: no files outside the changed set changed
-  *(or:* **LEAK: [list]** *, with what was reverted and what was only reported)*
+  *(or:* **LEAK: [list]** *— each reported, none reverted; inspect them before continuing)*
 - Manual fixes needed: [N] issues
   - `file:line` - [description]
 
@@ -1188,10 +1188,10 @@ Anything that writes touches only files inside the changed set. That covers
 - A whole-project cleanup is its own task, with its own bead and review.
 
 **After every step that writes,** compare `git status --short` with the
-snapshot taken before it. A tracked file outside the changed set that moved is
-a leak: revert it with `git checkout HEAD -- <path>` (it was clean before, so
-nothing is lost) and list it in the report. An untracked file outside the set
-is reported, never deleted without approval.
+snapshot taken before it. A file outside the changed set that moved is a leak:
+list it in the report and stop for inspection, but never revert it — it may be
+an edit that you or another agent made during the run. An untracked file
+outside the set is reported, never deleted without approval.
 
 ---
 

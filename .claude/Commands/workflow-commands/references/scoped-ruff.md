@@ -71,9 +71,8 @@ for path, xy in status().items():
     if path not in before:
         if xy == "??":
             leaks.append(f"{path} (untracked, left in place)")
-        else:
-            subprocess.run(["git", "checkout", "HEAD", "--", path], check=True)
-            leaks.append(f"{path} (reverted)")
+        else:  # may be someone else's edit made during the run: never revert it
+            leaks.append(f"{path} (changed during the run; NOT reverted, inspect it)")
     elif digest(path) != hashes.get(path):
         leaks.append(f"{path} (had uncommitted edits before; NOT reverted, review it)")
 if failed:
@@ -82,7 +81,7 @@ else:
     print(f"Auto-fix ran on {len(files)} changed file(s).")
 print("Scope check: no files outside the changed set" if not leaks
       else "Scope check: LEAK: " + "; ".join(leaks))
-sys.exit(1 if failed else 0)
+sys.exit(1 if failed or leaks else 0)
 PY
 ```
 
@@ -151,9 +150,8 @@ for path, xy in status().items():
     if path not in before:
         if xy == "??":
             leaks.append(f"{path} (untracked, left in place)")
-        else:
-            subprocess.run(["git", "checkout", "HEAD", "--", path], check=True)
-            leaks.append(f"{path} (reverted)")
+        else:  # may be someone else's edit made during the run: never revert it
+            leaks.append(f"{path} (changed during the run; NOT reverted, inspect it)")
     elif digest(path) != hashes.get(path):
         leaks.append(f"{path} (had uncommitted edits before; NOT reverted, review it)")
 if failed:
@@ -162,6 +160,6 @@ else:
     print(f"Auto-fix ran on {len(files)} changed file(s).")
 print("Scope check: no files outside the changed set" if not leaks
       else "Scope check: LEAK: " + "; ".join(leaks))
-sys.exit(1 if failed else 0)
+sys.exit(1 if failed or leaks else 0)
 PY
 ```
