@@ -92,8 +92,8 @@ from `.claude/Commands/workflow-commands/references/scoped-ruff.md`, unchanged (
 reach. In short, the block reads the changed set; skips without calling ruff when
 the set is UNKNOWN or holds no Python files; previews with `ruff check --diff`;
 applies `ruff check --fix --force-exclude` to the changed Python files only; and
-compares `git status` with its snapshot, restoring and reporting any file outside
-the set that changed.
+compares `git status` with its snapshot, reporting any file outside the set that
+changed — never reverting it — and exiting 1 so it is inspected.
 
 It typically resolves unused imports, import sorting, simple style issues and
 trailing whitespace. Record the block's `Auto-fixed:` and `Scope check:` lines in

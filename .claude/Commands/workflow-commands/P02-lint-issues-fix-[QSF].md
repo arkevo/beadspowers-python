@@ -80,8 +80,9 @@ implements is `.claude/rules/verification-write-scope.md`). In short, it:
 - skips entirely, without calling ruff, when the changed set is unknown or holds
   no Python files — it never widens to the project root;
 - previews with `ruff check --diff`, applies `ruff check --fix --force-exclude` to
-  those files only, then compares `git status` with its snapshot and restores and
-  reports any file outside the set that changed.
+  those files only, then compares `git status` with its snapshot: any file outside
+  the set that changed is reported, never reverted, and the block exits 1 so it is
+  inspected.
 
 It typically resolves unused imports, import sorting and simple style issues.
 

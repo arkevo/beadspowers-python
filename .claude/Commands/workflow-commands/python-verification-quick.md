@@ -59,7 +59,8 @@ set is UNKNOWN or holds no Python files; previews with `ruff check --diff`, a dr
 run that writes nothing; applies `ruff check --fix --force-exclude` to the changed
 Python files only (`--force-exclude` keeps ruff's own exclude list in force for
 files named on the command line); and then compares `git status` with its
-snapshot, restoring and reporting any file outside the set that changed.
+snapshot, reporting any file outside the set that changed — never reverting it —
+and exiting 1 so it is inspected.
 
 Record its `Auto-fixed:` and `Scope check:` lines in the report.
 
