@@ -50,7 +50,7 @@ something else.
 Every step that rewrites files runs one of two blocks, unchanged: `scoped-ruff-fix`
 for lint fixes, `scoped-ruff-format` for formatting. Both live in
 `.claude/Commands/workflow-commands/references/scoped-ruff.md`, which loads only when a step
-needs it: open it and run the block exactly as written — never retype or
+needs it (after a user-level install it lives under `~/.claude/` instead): open it and run the block exactly as written — never retype or
 paraphrase it. Each block reads the changed set itself, keeps only the files that
 are safe to rewrite, and never calls ruff with an empty file list
 (`ruff check --fix` with no paths rewrites the whole project). Then it:

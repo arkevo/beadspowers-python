@@ -26,8 +26,29 @@ commands — the plugin has no MCP layer (`beads-plugin-cli-only.md`).
 
 - A brand-new Dolt remote is empty, and `bd dolt pull` fails on it
   ("no branches found in remote"). Seed it once with `bd dolt push`
-  right after `bd dolt remote add` — the README setup does — and
+  right after `bd dolt remote add` — the setup below does — and
   pull first, push last works from then on.
+
+## Setting up a new project
+
+After `/beads:init` (or instead of it), finish the setup from the project root, on a
+setup branch because `bd init` commits to the current branch, then open a PR for it:
+
+```bash
+git switch -c chore/workflow-setup
+bd init --skip-agents
+bd config set export.git-add false
+printf '\nno-auto-import: true\n' >> .beads/config.yaml
+printf '\nissues.jsonl\n.session-state.json\n.workflow-step\n.verification-done\n' >> .beads/.gitignore
+git rm --cached --ignore-unmatch .beads/issues.jsonl
+bd dolt remote add origin git+https://github.com/<owner>/<repo>.git
+bd dolt push
+```
+
+Skip `bd init` if `/beads:init` already ran it. The ignored state files keep a ship
+from committing the workflow's own state. The final `bd dolt push` seeds the new
+remote; it publishes the beads on the project's git remote, so on a public
+repository the bead text is public.
 
 ## The JSONL export is a readable artifact, nothing else
 

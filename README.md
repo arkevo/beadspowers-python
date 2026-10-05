@@ -2,71 +2,6 @@
 
 Beadspowers is a Claude Code workflow for Python projects that combines **Beads** issue tracking with the **Superpowers** plan → execute → verify lifecycle, and enforces the order. Work one task at a time with you in the loop, or hand Claude a whole epic to plan and build across parallel agents.
 
-## Set up (once per project)
-
-1. Install the system tools (the workflow is verified with beads 1.0.4):
-
-   ```bash
-   brew install jq gh
-   gh auth login
-   npm install -g @beads/bd
-   ```
-
-2. Install the plugins, inside Claude Code:
-
-   ```
-   /plugin marketplace add steveyegge/beads
-   /plugin install beads@beads-marketplace
-   /plugin install superpowers@claude-plugins-official
-   /plugin install commit-commands@claude-plugins-official
-   /plugin marketplace add openai/codex-plugin-cc
-   /plugin install codex@openai-codex
-   ```
-
-   The last two lines add the Codex plugin. Only the full verification tier's adversarial review uses it, so skip them if you don't use Codex.
-
-3. From your project root, start a setup branch and copy the workflow in. `cp -n` never overwrites your files (it exits 1 when it skips one). If you already had a `.claude/settings.json`, merge this repo's `hooks` and `enabledPlugins` into it by hand.
-
-   ```bash
-   git switch -c chore/workflow-setup
-   cp -Rn /path/to/beadspowers-python/.claude/. .claude/
-   ```
-
-4. Make the hooks executable:
-
-   ```bash
-   chmod +x .claude/hooks/*.sh
-   ```
-
-5. Set up beads. `bd init` makes its own commit on the current branch. Beads sync through a Dolt remote on your git host, and `.beads/issues.jsonl` stays an untracked, readable export. The workflow's own state files (`.session-state.json`, `.workflow-step`, `.verification-done`) are ignored too, so a ship never commits them. The final `bd dolt push` seeds the new remote once: until it holds data, `bd dolt pull` fails with "no branches found". Pushing publishes your beads on that remote (a `refs/dolt/data` ref in the same repository), so on a public repository the bead text is public.
-
-   ```bash
-   bd init --skip-agents
-   bd config set export.git-add false
-   printf '\nno-auto-import: true\n' >> .beads/config.yaml
-   printf '\nissues.jsonl\n.session-state.json\n.workflow-step\n.verification-done\n' >> .beads/.gitignore
-   git rm --cached --ignore-unmatch .beads/issues.jsonl
-   bd dolt remote add origin git+https://github.com/<owner>/<repo>.git
-   bd dolt push
-   ```
-
-6. Find the placeholders and replace each one with your project's value:
-
-   ```bash
-   grep -rn -e '<owner>/<repo>' -e 'src/<your_package>/' -e '<project>_test' -e '<run-command>' .claude/
-   ```
-
-7. Commit the setup and open a PR. Merge it before your first task, because task branches start from the trunk; then update your local trunk: `git switch main && git pull` (use `master` if that is your trunk).
-
-   ```bash
-   git add .claude .beads/config.yaml .beads/.gitignore
-   git commit -m "chore: add the Beadspowers workflow"
-   git push -u origin HEAD
-   gh pr create --fill
-   ```
-
-8. Start a new Claude Code session in the project.
-
 ## One task
 
 1. `/beads:ready`
@@ -78,7 +13,9 @@ Beadspowers is a Claude Code workflow for Python projects that combines **Beads*
 
 ## An epic
 
-![Epic-batch workflow](docs/workflow-process-flow.drawio.png)
+The epic workflow is for work too big to drive one task at a time: a spec that turns into many tasks, some depending on others and some with open questions. Run one by one, that keeps you in the loop for every step and wastes the parallelism; run all at once with no structure, the agents collide on the same files and the decisions behind them get lost. So the pipeline turns a brainstormed spec (Superpowers) into a Beads epic whose tasks are sequenced into waves and given a plan depth — a full plan, a lite plan or a test-first task card — and answers the open questions with throwaway spikes before planning what depends on them. It then executes the approved plans as parallel Claude Code agents, each in its own git worktree (tasks that need you, such as smoke tests, run one at a time in the main session). Each task is built test-first and verified at a tier sized to its diff: ruff, mypy and pytest always, with review agents and a Codex adversarial pass added at the full tier. Beads labels record every task's progress, so an interrupted run resumes where it stopped; a budget gate shows the cost before each fan-out; and shipping opens one PR for the whole epic, which counts as shipped only after the merge is confirmed.
+
+![Epic-batch workflow](assets/workflow-process-flow.drawio.png)
 
 1. From the main checkout, after `git switch main && git pull`: `git worktree add ../<project>-<epic> -b feat/<epic-slug>`, then `cd ../<project>-<epic> && claude`
 2. `/superpowers:brainstorming` — the approved spec lands in `docs/plans/`. When it asks you to review the written spec, review it, then go to step 3 instead of approving there: approving makes brainstorming start writing an implementation plan, and the epic's plans come from steps 4–6.
@@ -111,4 +48,44 @@ If tasks are left over after step 11, unplanned ones go back to step 6 and unord
 - `.claude/Commands/workflow-commands/` — the single-task and epic-batch commands, plus the `python-verification-*` tiers.
 - `.claude/agents/` — the review agents the full verification tier runs.
 - `.claude/skills/` — troubleshooting skills, such as beads in a worktree.
-- `.claude/hooks/` — the Bash and file-write safety hooks wired up in `settings.json`.
+
+## Set up
+
+1. Install the system tools (the workflow is verified with beads 1.0.4):
+
+   ```bash
+   brew install jq gh
+   gh auth login
+   npm install -g @beads/bd
+   ```
+
+2. Install the plugins, inside Claude Code:
+
+   ```
+   /plugin marketplace add steveyegge/beads
+   /plugin install beads@beads-marketplace
+   /plugin install superpowers@claude-plugins-official
+   /plugin install commit-commands@claude-plugins-official
+   /plugin marketplace add openai/codex-plugin-cc
+   /plugin install codex@openai-codex
+   ```
+
+   The last two lines add the Codex plugin, which only the full verification tier's adversarial review uses; skip them if you don't use Codex.
+
+3. Copy the workflow in. It works at either level, so pick one:
+
+   - **User level (recommended)** — once, and it works in every project:
+
+     ```bash
+     cp -Rn /path/to/beadspowers-python/.claude/. ~/.claude/
+     ```
+
+   - **Project level** — only for one project, from its root:
+
+     ```bash
+     cp -Rn /path/to/beadspowers-python/.claude/. .claude/
+     ```
+
+   `cp -n` never overwrites a file you already have: it skips it silently and exits 1, so a same-named file already there keeps running, and re-copying never updates it. Avoid installing at both levels: a command that exists in both loads the user-level copy. Paths in the rules such as `.claude/Commands/...` mean `~/.claude/Commands/...` after a user-level install.
+
+4. In each new project, run `/beads:init` before you start the workflow, then ask Claude to finish the beads setup. It follows the "Setting up a new project" steps in the workflow's `beads.md` rule (untracked export, ignored state files, a seeded Dolt remote) and fills in project values such as `src/<your_package>/` as it works.
