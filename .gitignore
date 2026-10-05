@@ -29,3 +29,6 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Local docs (plans, specs) stay out of the repository
+docs/
