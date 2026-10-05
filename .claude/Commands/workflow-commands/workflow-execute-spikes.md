@@ -1,5 +1,5 @@
 ---
-description: Execute the approved SPIKE-FIRST tasks of a beads epic — run each lightweight prototype (exercising it against a running instance or headless as the unknown requires), record its findings + evidence to docs/plans/<epic-slug>/<spike-id>-findings.md, and close the spike task (the unblock signal for EXEC-GATED dependents). The lightweight bridge between /workflow-writing-plans and /workflow-execute-plans. NOT a clone of execute-plans — no epic-wide approval gate, no python-verification levels, no smoke gate, no merge.
+description: Execute the approved SPIKE-FIRST tasks of a beads epic — run each lightweight prototype (exercising it against a running instance or headless as the unknown requires), record its findings + evidence to docs/plans/<epic-slug>/<spike-id>-findings.md, and close the spike task (the unblock signal for EXEC-GATED dependents). The lightweight bridge between /workflow-commands:workflow-writing-plans and /workflow-commands:workflow-execute-plans. NOT a clone of execute-plans — no epic-wide approval gate, no python-verification levels, no smoke gate, no merge.
 ---
 
 # Workflow: Execute Spikes for an Epic (Python)
@@ -9,13 +9,13 @@ each spike's unknown — **exercising the prototype against a running instance w
 that's the only way to learn** — **record findings + evidence** to
 `docs/plans/<epic-slug>/<spike-id>-findings.md`, and **close the spike task** —
 which is the unblock signal that lets `EXEC-GATED` dependents rejoin
-`/workflow-writing-plans` on its next run.
+`/workflow-commands:workflow-writing-plans` on its next run.
 
 This is the **bridge** the pipeline depends on:
-`/workflow-planning-sequence` → `/workflow-writing-plans` (spikes get a lightweight
+`/workflow-commands:workflow-planning-sequence` → `/workflow-commands:workflow-writing-plans` (spikes get a lightweight
 plan; `EXEC-GATED` dependents are deferred) → **this command** (execute the spikes,
-record findings) → `/workflow-writing-plans` re-run (now-unblocked dependents plan
-against the findings) → `/workflow-execution-sequence` → `/workflow-execute-plans`.
+record findings) → `/workflow-commands:workflow-writing-plans` re-run (now-unblocked dependents plan
+against the findings) → `/workflow-commands:workflow-execution-sequence` → `/workflow-commands:workflow-execute-plans`.
 
 This command obeys the beads workflow router
 (`.claude/rules/0_Beads x Superpowers/beads-workflow-router.md`), the hard-lock rules
@@ -24,8 +24,8 @@ This command obeys the beads workflow router
 under `docs/plans/`). It uses the **beads plugin skills** for all issue operations
 (`.claude/rules/0_Beads x Superpowers/skill-usage.md`), never ad-hoc `bd` CLI.
 
-> **Why this is a separate command (not `/workflow-execute-plans --spikes`).**
-> `/workflow-execute-plans` has a **hard epic-level approval gate** — it refuses
+> **Why this is a separate command (not `/workflow-commands:workflow-execute-plans --spikes`).**
+> `/workflow-commands:workflow-execute-plans` has a **hard epic-level approval gate** — it refuses
 > unless *every* task in the epic is `wp:approved`. At spike time the `EXEC-GATED`
 > dependents are deliberately `wp:deferred`, so the epic is never fully approved and
 > that command would refuse to run the spikes. It is also the wrong weight: a spike
@@ -49,7 +49,7 @@ feasibility yes/no), not to ship code. So:
   against a running instance** (real latency, real output shape). This
   command runs it and records what it observed — but this is an **observation, NOT the
   formal smoke *gate***: nothing merges, there is no `python-verification` level
-  (those belong to `/workflow-execute-plans`).
+  (those belong to `/workflow-commands:workflow-execute-plans`).
 - **Closing the spike task is the unblock signal.** Do not close a spike until its
   findings are recorded.
 
@@ -101,7 +101,7 @@ subjective correctness, "does this feel right" — exercised **attended** in mai
 | Agent model | **Opus** (`opts.model: "opus"` — a tier alias, never a pinned version) |
 | Reasoning effort | **high** (unknown-resolution is reasoning-heavy) |
 | Git model | **Throwaway worktree per spike** (`opts.isolation: 'worktree'`); prototype **discarded**, never merged. Only the findings file + evidence land on the epic branch. |
-| Budget shown as | **% of the 5-hr Opus high usage limit** |
+| Budget shown as | **% of the 5-hr usage limit** |
 
 Auto-observe spikes fan out one agent each (concurrency `min(16, cores − 2)`);
 human-verdict spikes run serialized in main context.
@@ -158,6 +158,10 @@ Resuming: R from prior sk:* stages · skipping J already sk:done
 Agents: ≈A (one per auto-observe spike, throwaway worktree; cap min(16, cores−2))
 Est. cost: ~X–Y% of the 5-hr limit
 Deliverable: docs/plans/<epic-slug>/<spike-id>-findings.md (+ evidence) per spike; code discarded
+
+This fan-out creates temporary worktree branches, which are removed as each
+agent finishes (spike code is never merged back); approving this gate is the
+branch approval that `critical ai agent rule.md` requires.
 
 Proceed? (yes / adjust scope / cancel)
 ```
@@ -253,7 +257,7 @@ data is cleaned up). Pull every task's current stage (`wp:*` / `sk:*`) via
 `beads:show` / `beads:list` and say:
 
 - **Which `EXEC-GATED` tasks just unblocked** — every task whose upstream spike
-  is now `sk:done`, and what it needs next (a `/workflow-writing-plans` re-run
+  is now `sk:done`, and what it needs next (a `/workflow-commands:workflow-writing-plans` re-run
   to actually draft it — `EXEC-GATED` tasks are never planned until this
   moment).
 - **Whether there's a next layer of spikes** — if some spikes are themselves
@@ -263,13 +267,18 @@ data is cleaned up). Pull every task's current stage (`wp:*` / `sk:*`) via
   hasn't run yet, or a task waiting on execution further downstream. Say so
   plainly; it's expected pipeline behavior, not an error.
 
-State the single next command plainly:
+Close with the next steps as a numbered list, `/clear` as its own step before the
+next phase's command. Normally:
 
 ```
-/workflow-writing-plans <epic-id>
+1. /clear
+2. /workflow-commands:workflow-writing-plans <epic-id>
 ```
 
-and mention re-running this command instead if a further spike layer is next.
+That re-run plans every `EXEC-GATED` task these findings unblocked. When the next
+layer of spikes is already approved and was only waiting on the spikes that just
+closed, run this command again first instead: `/clear`, then
+`/workflow-commands:workflow-execute-spikes <epic-id>`.
 
 ---
 
@@ -289,7 +298,7 @@ Use `beads:label` / `beads:close` / `beads:show` / `beads:list` skills — never
 
 - **The formal smoke *gate*** (human pass/fail before merge), **`python-verification`
   levels**, **merge**, and the **cumulative full-sweep** — all belong to
-  `/workflow-execute-plans`. Here you *exercise to learn*, not *verify to ship*.
+  `/workflow-commands:workflow-execute-plans`. Here you *exercise to learn*, not *verify to ship*.
 - **The epic-wide approval gate** — gated only on the selected spikes.
 - **A separate status/resume command** — resumability is via the `sk:*` labels.
 

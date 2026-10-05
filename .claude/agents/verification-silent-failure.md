@@ -1,6 +1,6 @@
 ---
 name: verification-silent-failure
-description: Parallel verification agent for Phase 7. Hunts silent failures, inadequate error handling, and inappropriate fallbacks in changed Python files only. Returns structured findings.
+description: Parallel verification agent for Phase 7. Hunts silent failures, inadequate error handling, inappropriate fallbacks, and the bug-scan classes (None handling, async misuse, resource lifecycle, shared mutable state, silent wrong results) in changed Python files only. Returns structured findings.
 model: opus
 ---
 
@@ -33,6 +33,35 @@ In changed files, locate:
 
 Use Grep to efficiently search for these patterns without reading entire files
 unnecessarily.
+
+### Step 1.5: Bug Scan
+
+The full tier's Phase 3 used to run a separate bug scan in the main context. In
+the downstream project this workflow comes from, it never surfaced a defect this
+agent did not also report, so the scan lives here now. Over the same changed
+files, look for the large bugs that are not silent failures in the strict sense:
+
+- **None handling:** attribute access, indexing or calls on a value that can be
+  `None` on a real path; `cast()` or `# type: ignore` hiding it; `assert` as the
+  only runtime guard; attributes first assigned outside `__init__`; falsy values
+  (`0`, `""`, `[]`) treated as missing
+- **Async misuse:** coroutines never awaited; `create_task()` results not kept, so
+  the task can be garbage-collected mid-flight; blocking calls inside
+  `async def`; `CancelledError` swallowed; resources used after their `with`
+  block closed them
+- **Resource lifecycle:** files, sockets, connections, sessions, HTTP clients,
+  `subprocess.Popen`, executors or pools opened without `with`/`finally`; locks
+  without a release in `finally`; threads never joined
+- **Shared mutable state:** mutable default arguments and class attributes;
+  unlocked state shared across threads or tasks; a collection mutated while
+  iterating it; late-binding closures in loops
+- **Silent wrong results:** a generator consumed twice; naive and aware
+  datetimes mixed
+
+Focus on bugs a senior engineer would stop the merge for. Ignore anything ruff or
+mypy already reports under the project's configuration. Report them through the
+same JSON contract below, with `pattern` naming the bug class and
+`hidden_errors` describing what goes wrong at runtime.
 
 ### Step 2: Audit Each Handler
 

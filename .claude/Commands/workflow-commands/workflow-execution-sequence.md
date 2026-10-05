@@ -1,18 +1,18 @@
 ---
-description: Given a beads epic, compute its transitive blocks-dependency closure (cross-epic), topologically sort it into execution waves with per-task predecessors, flag every task missing an approved plan, drive /workflow-writing-plans per owning epic for the gaps, and label the closure (exec:<slug>) when it spans epics so /workflow-execute-plans executes the enablers too. The execution-order analog of /workflow-planning-sequence; the precursor that makes an epic safe to hand to /workflow-execute-plans.
+description: Given a beads epic, compute its transitive blocks-dependency closure (cross-epic), topologically sort it into execution waves with per-task predecessors, flag every task missing an approved plan, drive /workflow-commands:workflow-writing-plans per owning epic for the gaps, and label the closure (exec:<slug>) when it spans epics so /workflow-commands:workflow-execute-plans executes the enablers too. The execution-order analog of /workflow-commands:workflow-planning-sequence; the precursor that makes an epic safe to hand to /workflow-commands:workflow-execute-plans.
 ---
 
 # Workflow: Execution Sequence for an Epic
 
-Given a beads epic, answer the question `/workflow-execute-plans` cannot answer on
+Given a beads epic, answer the question `/workflow-commands:workflow-execute-plans` cannot answer on
 its own: **"in what order, across which epics, and with which plans, do I actually
 ship this?"** This command computes the epic's full **execution dependency closure**
 (following `blocks` edges, which routinely cross epic boundaries), topologically
 sorts it into **execution waves**, reports which tasks have **no approved plan
-yet**, and — on approval — runs `/workflow-writing-plans` for each owning epic so
+yet**, and — on approval — runs `/workflow-commands:workflow-writing-plans` for each owning epic so
 the closure becomes execution-ready.
 
-This is the **execution-order** sibling of `/workflow-planning-sequence` (which
+This is the **execution-order** sibling of `/workflow-commands:workflow-planning-sequence` (which
 decomposes a *spec* into an epic + *planning* waves). This command starts from an
 **existing epic** and produces *execution* waves + a plan-coverage gate.
 
@@ -40,9 +40,9 @@ Two derived facts matter:
 
 1. **Execution waves** — topological layers; every task in wave *N* has all its
    `blocks`-predecessors in waves `< N`. Wave 1 = tasks with zero open blockers.
-2. **Plan coverage** — `/workflow-execute-plans` requires `wp:approved` +
+2. **Plan coverage** — `/workflow-commands:workflow-execute-plans` requires `wp:approved` +
    plan `status: approved` per task. Any closure task lacking that is a **gap** that
-   must be planned (via `/workflow-writing-plans`) before execution.
+   must be planned (via `/workflow-commands:workflow-writing-plans`) before execution.
 
 ---
 
@@ -51,7 +51,7 @@ Two derived facts matter:
 | Setting | Value |
 |---------|-------|
 | This command's own work | Cheap: read-only graph analysis (one `bd export` + a local topo-sort). No agents. |
-| The planning it triggers | `/workflow-writing-plans` per gap-epic — **Opus / xhigh**, ~one agent per task. Gated (Step 5). |
+| The planning it triggers | `/workflow-commands:workflow-writing-plans` per gap-epic — **Opus**, effort chosen per task by difficulty (`medium` task cards, `high` lite and spike plans, `high` or `xhigh` full plans), ~one agent per task plus one refinement agent per full plan. Gated (Step 5). |
 | Git | No code changes; writes one analysis doc under `docs/plans/` and (via the planning sub-command) plan files. |
 
 ---
@@ -69,7 +69,8 @@ Each step is tagged **[main ctx]** (needs the user / orchestrates) or **[script]
 Derive `<epic-slug>` (lowercase kebab from the title) for the artifact path.
 
 ### 2. [script] Compute the transitive blocks-closure
-Refresh the graph (`bd export --no-auto-import` writes `.beads/issues.jsonl`), then
+Refresh the readable export first (`bd export -o .beads/issues.jsonl`; plain
+`bd export` only prints to stdout), then
 traverse `dependencies[]` where `type == "blocks"` (ignore `parent-child`), starting
 from the epic's children, collecting every reachable task — **including cross-epic
 ones**. Exclude `closed` tasks (their edges are already satisfied).
@@ -132,8 +133,8 @@ last `.`, mapped to its epic id). This grouping is what drives Step 6.
 > **"Gap" = missing the execute-gate, NOT missing design coverage.** Most tasks
 > already reference a design spec in their description (epic spec, per-model plan,
 > design doc). That is *input* to planning, not the `wp:approved` gate.
-> `/workflow-execute-plans` refuses to run without `wp:approved`, so even a
-> well-specified task must pass through `/workflow-writing-plans` once — but that
+> `/workflow-commands:workflow-execute-plans` refuses to run without `wp:approved`, so even a
+> well-specified task must pass through `/workflow-commands:workflow-writing-plans` once — but that
 > command's Step 3 **skip-gate** stamps a sufficiently-detailed description
 > `wp:skipped` (the description *becomes* the plan) instead of re-writing it.
 > Classify each gap so the Step 5 cost preview is honest:
@@ -150,14 +151,15 @@ Print:
 
 Then **save the analysis** to `docs/plans/<date>-<epic-slug>-execution-sequence.md`.
 
-Because the next step launches **expensive Opus-4.8/xhigh planning workflows**,
-show a budget/scope preview and require explicit confirmation (mirror
-`/workflow-writing-plans` Step 2):
+Because the next step launches **expensive Opus planning workflows** (effort
+scaled per task by difficulty, up to xhigh), show a budget/scope preview and
+require explicit confirmation (mirror `/workflow-commands:workflow-writing-plans`
+Step 2):
 
 ```
 📋 Execution sequence for **<epic-id> "<Title>"**
 Closure: N tasks across K epics · M waves · no cycles
-Plan gaps: G tasks in E epics  →  will run /workflow-writing-plans on: <epic-a>, <epic-b>, …
+Plan gaps: G tasks in E epics  →  will run /workflow-commands:workflow-writing-plans on: <epic-a>, <epic-b>, …
 Est. planning cost: ~X–Y% of the 5-hr usage limit (≈ one agent per gap task)
 Proceed with planning? (yes / pick a subset of epics / sequence only — skip planning / cancel)
 ```
@@ -169,23 +171,23 @@ On approval, for **each owning epic with gaps** (in execution-wave order so
 upstream enablers are planned first), invoke:
 
 ```
-/workflow-writing-plans <epic-id>
+/workflow-commands:workflow-writing-plans <epic-id>
 ```
 
-`/workflow-writing-plans` is now **sequence-file-driven**: passing `<epic-id>`
+`/workflow-commands:workflow-writing-plans` is now **sequence-file-driven**: passing `<epic-id>`
 resolves that epic's planning-sequence file under `docs/plans/<epic-slug>/`. If
 no sequence file exists yet, first generate one non-destructively with
-`/workflow-planning-sequence --epic <epic-id>` (epic mode classifies the existing
-tasks and emits the file), then run `/workflow-writing-plans <epic-id>`.
+`/workflow-commands:workflow-planning-sequence --epic <epic-id>` (epic mode classifies the existing
+tasks and emits the file), then run `/workflow-commands:workflow-writing-plans <epic-id>`.
 
 Run them **one epic at a time**, honoring that command's own preview/budget gate
 and its `wp:*` resume labels (already-approved tasks are skipped, so re-runs are
 incremental). Do **not** plan inside this command — always delegate to
-`/workflow-writing-plans` (never hand-roll plan prose).
+`/workflow-commands:workflow-writing-plans` (never hand-roll plan prose).
 
-> Note on naming: this command computes **execution** waves; `/workflow-planning-sequence`
-> computes **planning** waves and emits the sequence file `/workflow-writing-plans`
-> consumes. In **epic mode** (`--epic <id>`) `/workflow-planning-sequence` applies to
+> Note on naming: this command computes **execution** waves; `/workflow-commands:workflow-planning-sequence`
+> computes **planning** waves and emits the sequence file `/workflow-commands:workflow-writing-plans`
+> consumes. In **epic mode** (`--epic <id>`) `/workflow-commands:workflow-planning-sequence` applies to
 > *existing* epic tasks; in spec mode it decomposes a *spec* into a new epic.
 
 ### 7. [main ctx] Label the closure (if cross-epic) + Epic Status & Next-Steps Summary
@@ -193,10 +195,10 @@ Once every closure task is `wp:approved`:
 
 - **If the closure spans more than one epic**, apply the shared label
   **`exec:<epic-slug>`** to **every task in the closure** (via the `beads:label`
-  skill). This is the durable, inspectable scope `/workflow-execute-plans` consumes
+  skill). This is the durable, inspectable scope `/workflow-commands:workflow-execute-plans` consumes
   (its Step 0a). It is **required, not optional**: without it a bare
-  `/workflow-execute-plans <epic-id>` builds only the named epic's children and
-  **silently skips the cross-epic enablers** — and `/workflow-execute-plans` now
+  `/workflow-commands:workflow-execute-plans <epic-id>` builds only the named epic's children and
+  **silently skips the cross-epic enablers** — and `/workflow-commands:workflow-execute-plans` now
   **refuses** a bare cross-epic run that has no `exec:<slug>` label.
 - **If the closure is self-contained** (closure == the epic's own children), no label
   is needed — the bare epic-id is an unambiguous scope.
@@ -205,12 +207,14 @@ Then give the user a plain-language status report, not just the wave table:
 state whether the closure is self-contained or spans multiple epics (and, if
 so, which ones), whether every closure task actually reached full approval
 this run or some are still gaps, and flag any `spike-first` task in the
-closure that still needs `/workflow-execute-spikes` before it counts as
-executed. Restate the **execution-wave order**, then hand off with the single
-next command:
+closure that still needs `/workflow-commands:workflow-execute-spikes` before it counts as
+executed. Restate the **execution-wave order**, then hand off with the next
+steps, `/clear` first — execution starts in a fresh context, and the plans and
+labels carry everything it needs:
 
 ```
-/workflow-execute-plans <epic-id>
+1. /clear
+2. /workflow-commands:workflow-execute-plans <epic-id>
 ```
 
 ---
@@ -234,13 +238,13 @@ Permanent under `docs/plans/` (Git Best Practices/protect_plans_and_commit_all.m
   epic is self-contained. Call out cross-epic enablers explicitly.
 - **Cycles are a hard stop.** `bd dep cycles` must be clean before emitting an order.
 - **Label cross-epic closures.** When the closure spans epics, apply `exec:<slug>` to
-  the whole closure (Step 7) so `/workflow-execute-plans` executes the enablers, not
+  the whole closure (Step 7) so `/workflow-commands:workflow-execute-plans` executes the enablers, not
   just the named epic. A bare cross-epic hand-off is a silent-skip bug, and the
   executor refuses it without the label.
 - **Exclude closed tasks** from the closure (their edges are satisfied) but report them
   if the user asks "why is this already unblocked?".
-- **Budget gate before planning.** Never launch `/workflow-writing-plans` runs before
+- **Budget gate before planning.** Never launch `/workflow-commands:workflow-writing-plans` runs before
   the Step 5 confirmation — they are the expensive part.
 - **Don't plan here.** Decompose + sequence + detect gaps only; delegate planning to
-  `/workflow-writing-plans` and execution to `/workflow-execute-plans`.
+  `/workflow-commands:workflow-writing-plans` and execution to `/workflow-commands:workflow-execute-plans`.
 - **Beads via skills**, plans under `docs/plans/`, user always picks the epic.

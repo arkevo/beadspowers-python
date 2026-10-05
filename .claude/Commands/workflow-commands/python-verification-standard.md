@@ -9,6 +9,13 @@ For medium changes (50-200 lines), run analysis phases without spawning parallel
 agents. This provides thorough code review without the overhead of agent
 orchestration.
 
+**Retired: Phase 4 (architecture validation) and Phase 5 (code simplification).**
+Across every recorded verification run in the downstream project this workflow
+comes from, neither phase produced a single finding, at standard or full level,
+so both tiers dropped them and their standalone skill files were deleted. Do not
+re-add them here. An architecture review that a task genuinely needs is its own
+task, with its own bead.
+
 ---
 
 ## When to Use
@@ -28,9 +35,16 @@ Before reviewing any code:
 ### Step 1: Identify Changed Files
 
 - Read `modified_files` from `.beads/.session-state.json`
-- If session state unavailable, ask user for file list
+- If the file is missing or unreadable, **or** `modified_files` is empty, the
+  changed set is **UNKNOWN**. You may ask the user for a file list to guide the
+  review phases, but Phase 2's auto-fix is skipped in this state — never widened
+  to the project root (`.claude/rules/verification-write-scope.md`). A list the
+  user volunteers is a valid changed set; echo it back in the report. Write it
+  into `modified_files` first, as `.claude/rules/verification-write-scope.md`
+  describes, so the write blocks see it.
 - Note which directories/layers were affected
-- **Scope all subsequent phases to ONLY these files**
+- **Scope all subsequent phases to ONLY these files**: the review phases report
+  only on them, and nothing outside them is ever written
 
 ### Step 2: Gather Relevant Rules
 
@@ -51,11 +65,15 @@ Before reviewing any code:
 
 ### Step 1: Run Static Analysis
 
-Run ruff and mypy on changed files only:
+Run ruff and mypy on the changed set's Python files. `<changed .py/.pyi files>`
+stands for the changed set's `.py`/`.pyi` files only — ruff and mypy fail on
+anything else, such as a `README.md` — and when it has none, skip every command
+that takes it and say so in the report. Analysis only reads, so when the changed
+set is UNKNOWN, run the same two commands on `src/ tests/` instead:
 
 ```bash
-ruff check <changed_files>
-mypy <changed_files>
+ruff check --no-fix <changed .py/.pyi files>
+mypy <changed .py/.pyi files>
 ```
 
 ### Step 2: Categorize Issues
@@ -66,24 +84,33 @@ mypy <changed_files>
 | **Warnings** | Should fix - potential bugs |
 | **Info/Hints** | Consider fixing if quick |
 
-### Step 3: Auto-Fix
+### Step 3: Auto-Fix — scoped to the changed set, or skipped
 
-Run `ruff check --fix` to automatically resolve:
-- Unused imports
-- Import sorting
-- Simple style issues
-- Trailing whitespace
+Never auto-fix outside the task's changed set. Run the `scoped-ruff-fix` block
+from `.claude/Commands/workflow-commands/references/scoped-ruff.md`, unchanged (policy:
+`.claude/rules/verification-write-scope.md`) — never a bare `ruff check --fix`, which rewrites every file it can
+reach. In short, the block reads the changed set; skips every write when
+the set is UNKNOWN or holds no Python files (a changed notebook is still linted,
+read-only); previews with `ruff check --diff`;
+applies `ruff check --fix --force-exclude` to the changed Python files only; and
+compares `git status` with its snapshot, reporting any file outside the set that
+changed — never reverting it — and exiting 1 so it is inspected.
+
+It typically resolves unused imports, import sorting, simple style issues and
+trailing whitespace. Record the block's `Auto-fixed:` and `Scope check:` lines in
+the report.
 
 ### Step 4: Manual Fixes (if needed)
 
-Address remaining errors and warnings:
+Address the remaining errors and warnings in the changed files (an issue in a
+file outside the changed set is reported, not fixed):
 1. Fix errors first (blocking)
 2. Address warnings that could cause runtime issues
 3. Apply quick style fixes
 
 ### Step 5: Verify Fixes
 
-Run `ruff check` again to confirm resolution.
+Run `ruff check --no-fix` again to confirm resolution.
 
 ---
 
@@ -102,15 +129,30 @@ Audit changes against `.claude/rules/`:
 
 ### Check #2: Bug Scan
 
-Shallow scan for obvious bugs:
-- Type annotation issues
-- Missing error handling
-- Incorrect async/await usage
-- Resource management (unclosed files, connections)
-- Thread safety / async issues
-- Resource leaks (unclosed files, database connections)
+Standard runs no review agents, so this shallow scan is its only bug pass. It
+looks for the same classes the full tier's silent-failure agent scans for:
 
-**Focus on:** Large bugs, not nitpicks. Ignore what linter catches.
+- **None handling:** attribute access, indexing or calls on a value that can be
+  `None` on a real path; `cast()` or `# type: ignore` hiding it; `assert` as the
+  only runtime guard; attributes first assigned outside `__init__`; falsy values
+  treated as missing
+- **Async misuse:** coroutines never awaited; `create_task()` results not kept;
+  blocking calls inside `async def`; `CancelledError` swallowed; resources used
+  after their `with` block closed them
+- **Resource lifecycle:** files, sockets, connections, sessions, HTTP clients,
+  `subprocess.Popen`, executors or pools opened without `with`/`finally`; locks
+  without a release in `finally`; threads never joined
+- **Shared mutable state:** mutable default arguments and class attributes;
+  unlocked state shared across threads or tasks; a collection mutated while
+  iterating it; late-binding closures in loops
+- **Silent wrong results:** a generator consumed twice; naive and aware datetimes
+  mixed
+- **Swallowed errors:** bare `except:`, `except Exception: pass`, errors reported
+  with `print()` (the full tier hands this to its silent-failure agent; standard
+  checks it here)
+
+**Focus on:** large bugs a senior engineer would stop the merge for, not nitpicks.
+Ignore anything ruff or mypy already reports under the project's configuration.
 
 ### Check #3: Historical Context
 
@@ -135,89 +177,9 @@ Verify tests exist and pass:
 
 ---
 
-## Phase 4: Architecture Validation
-
-Validate architecture for changed files and immediate dependencies.
-
-### Layer Compliance Check
-
-| Layer | Purpose | Allowed Dependencies |
-|-------|---------|---------------------|
-| **API/CLI** | Routes, CLI commands, entry points | Services, Core |
-| **Services** | Business logic, orchestration | Domain, Data, Core |
-| **Domain** | Core business rules, entities | Core only |
-| **Data** | Repositories, database access | Core only |
-| **Core** | Shared utilities, config | None (leaf layer) |
-
-**Detect:**
-- API/CLI layer importing Data directly
-- Data layer containing business logic
-- Circular dependencies between layers
-
-### SOLID Principles Check
-
-| Principle | Verify |
-|-----------|--------|
-| **S**ingle Responsibility | Each class/module has ONE reason to change |
-| **O**pen/Closed | Extend via composition, not modification |
-| **L**iskov Substitution | Subclasses are substitutable |
-| **I**nterface Segregation | Small, focused ABCs/Protocols |
-| **D**ependency Inversion | Depend on abstractions |
-
-### Class Design Check
-
-- Small, focused classes with single responsibility
-- Composition over inheritance
-- `@dataclass(frozen=True)` for value types
-- No business logic in `__init__`
-- No side effects in properties
-
-### Code Quality Standards
-
-- Functions: < 20 lines, single purpose
-- Line length: <= 88 characters (ruff default)
-- Naming: PascalCase (classes), snake_case (everything else)
-- Error handling: try-except with specific exceptions
-- Type hints on all public functions
-- Logging: Use `logging` module (NOT print)
-
----
-
-## Phase 5: Code Simplification Review
-
-Focus on recently modified code and evaluate:
-
-### Clarity Enhancements
-
-- [ ] Reduced unnecessary complexity?
-- [ ] Large functions (>20 lines) broken into smaller functions?
-- [ ] Generators or itertools for large sequences?
-- [ ] No expensive operations in properties?
-- [ ] Clear variable and function names?
-- [ ] Structural pattern matching where it simplifies code?
-
-### Python Standards
-
-- [ ] Frozen dataclasses for value types?
-- [ ] Composition over class inheritance?
-- [ ] Type hints on public APIs?
-- [ ] Google-style docstrings for public APIs?
-- [ ] List comprehensions where clearer than loops?
-- [ ] Context managers for resource management?
-- [ ] F-strings for string formatting?
-
-### Balance Check (Avoid Over-Simplification)
-
-- [ ] Not removing helpful abstractions?
-- [ ] Not combining too many concerns?
-- [ ] Proper separation of concerns maintained?
-- [ ] Code remains debuggable and extensible?
-
----
-
 ## Phase 9: Confidence Scoring
 
-For each issue found (Phases 3-5), assign a confidence score:
+For each issue found (Phase 3), assign a confidence score:
 
 | Score | Meaning |
 |-------|---------|
@@ -248,8 +210,8 @@ Exclude from final report:
 
 Run final verification sequence:
 
-1. `ruff check <changed_files>` via Bash - Confirm no lint errors
-2. `ruff format --check <changed_files>` via Bash - Ensure consistent formatting
+1. `ruff check --no-fix <changed .py/.pyi files>` via Bash - Confirm no lint errors
+2. `ruff format --check <changed .py/.pyi files>` via Bash - Ensure consistent formatting
 3. `pytest -v` via Bash - Execute all tests
 
 **All must pass before claiming completion.**
@@ -258,22 +220,29 @@ Run final verification sequence:
 
 ## Phase 14: Security Review (Auto-Triggered)
 
-**This phase auto-triggers when changed files match sensitive patterns.**
+**This phase runs only when the gate below matches.**
 
-### Auto-Trigger Detection
+### Gate: Sensitive File Patterns
 
-Check if any changed files match:
+Check whether any file in the changed set matches. An UNKNOWN changed set counts
+as a match.
 
 **Path patterns:**
-- `src/**/auth/**`
-- `src/**/api/**`
-- `src/**/service*/**`
-- `src/**/repository/**`
-- `src/**/network/**`
+- `src/**/auth/**`, `src/**/api/**`, `src/**/service*/**`, `src/**/repository/**`,
+  `src/**/network/**`, `src/**/http/**`
+- `**/migrations/**`, `alembic/versions/**`, `**/*.sql`
+- settings modules (`**/settings.py`, `**/settings/**`)
+- environment files (`.env`, `.env.*`)
 
-**Content patterns (file contains):**
-- `apiKey`, `api_key`, `secret`, `token`, `password`
+**Content patterns (the changed file contains):**
+- `apiKey`, `api_key`, `secret`, `token`, `password`, `credential` (any case)
 - `requests`, `httpx`, `http`
+- `eval(`, `exec(`, `pickle`, `yaml.load`, `subprocess`, `shell=True`,
+  `verify=False`, `DEBUG`, `random.`
+- `GRANT`, `REVOKE`, `CREATE POLICY`, `ROW LEVEL SECURITY`, `SECURITY DEFINER`
+
+**No match →** skip the checks and record `Security review: Skipped (no sensitive files)`.
+**Match →** run the checks below and record `Security review: Triggered (<matching files>)`.
 
 ### If Triggered: Run Security Checks
 
@@ -281,21 +250,29 @@ Check if any changed files match:
 2. **HTTPS enforcement** - Verify no HTTP URLs (except localhost)
 3. **Environment variables** - Sensitive data uses env vars or python-dotenv, not hardcoded
 4. **SQL injection** - No raw SQL queries with user input
-5. **Dangerous functions** - No `eval()`, `exec()`, `pickle.loads()` on untrusted data
+5. **Dangerous functions** - No `eval()`, `exec()`, `pickle.loads()`, or `yaml.load()` without a safe loader, on untrusted data
 6. **Subprocess safety** - No `shell=True` with user input
 7. **SSL verification** - No `verify=False` in requests/httpx
 8. **Debug mode** - No `DEBUG=True` in production config
-9. **Error exposure** - Errors don't leak internal details to users
+9. **Weak randomness** - No `random` module for tokens, passwords or IDs (use `secrets`)
+10. **Database authorization** - Grants, revokes, row-level security policies and `SECURITY DEFINER` functions read for cross-user access: each policy names the requesting user, and the application-side check it backs still exists
+11. **Committed secrets** - No `.env` file is tracked in git (`git ls-files | grep '\.env'`)
+12. **Error exposure** - Errors don't leak internal details to users
 
-### If NOT Triggered
+### Report Format
 
-Skip this phase - no sensitive files modified.
+```markdown
+### Security Review (Phase 14)
+**Status:** [Triggered (<matching files>) / Skipped (no sensitive files)]
+**Findings:**
+- [ ] `file:line` - [issue description] (CRITICAL/HIGH/MEDIUM)
+```
 
 ---
 
 ## Phase 13: Write Verification Marker (ONLY on PASS)
 
-The router's *Hard Stop: Verification Before Ship / "Done"* and `beads-ship-task`
+The router's *Verification Before Ship / "Done"* and `workflow-commands:beads-ship-task`
 gate on this marker. Write it ONLY after Phase 11's tests pass — never on failure:
 
 ```bash
@@ -303,7 +280,9 @@ TASK=$(python3 -c "import json;print(json.load(open('.beads/.session-state.json'
 printf '{"level":"standard","task":"%s","passed":true,"at":"%s"}\n' "$TASK" "$(date -u +%FT%TZ)" > .beads/.verification-done
 ```
 
-If any phase FAILED, do NOT write the marker (leave any prior one; the gate stays closed).
+If any phase FAILED, do NOT write the marker, and delete any prior one
+(`rm -f .beads/.verification-done`): a marker left by an earlier passing run would
+keep the ship gate open.
 
 ---
 
@@ -312,8 +291,6 @@ If any phase FAILED, do NOT write the marker (leave any prior one; the gate stay
 ```markdown
 ## Standard Verification Report
 
-### Architecture Score: X/10
-
 ### Summary
 Ran standard verification on [N] files ([M] lines).
 Found [X] issues. [Y] auto-fixed. [Z] require attention.
@@ -321,7 +298,9 @@ Found [X] issues. [Y] auto-fixed. [Z] require attention.
 ---
 
 ### Lint Results (Phase 2)
-**Auto-fixed:** [N] issues
+**Auto-fixed:** [N] issues across [M] changed files
+*(or:* `SKIPPED (changed set unknown)` *or* `SKIPPED (no Python files in the changed set)` *or* `FAILED (<ruff call> exited <code>)`, a failed lint phase *)*
+**Scope check:** no files outside the changed set / **LEAK: [list]** / not run (the block skipped, or failed on notebooks before any write)
 **Manual fixes needed:**
 - `file:line` - [description]
 
@@ -334,26 +313,6 @@ Found [X] issues. [Y] auto-fixed. [Z] require attention.
 **Source:** [rules compliance / bug scan / etc.]
 **File:** `path/to/file.py:line`
 **Suggested fix:** [how to resolve]
-
----
-
-### Architecture Violations (Phase 4)
-
-| Layer | Status | Issue |
-|-------|--------|-------|
-| API/CLI | OK/WARN | Description |
-| Services | OK/WARN | Description |
-| Domain | OK/WARN | Description |
-| Data | OK/WARN | Description |
-| Core | OK/WARN | Description |
-
----
-
-### Simplification Opportunities (Phase 5)
-
-1. **[File/Class]:** [Opportunity]
-   - Before: [description]
-   - After: [suggestion]
 
 ---
 
@@ -402,4 +361,4 @@ Invoke this skill when:
 | 11.5 | Package Build Validation | Time-intensive |
 | 12 | Test Coverage Analysis | Requires agent |
 
-For comprehensive verification, use `/python-verification-full`.
+For comprehensive verification, use `/workflow-commands:python-verification-full`.

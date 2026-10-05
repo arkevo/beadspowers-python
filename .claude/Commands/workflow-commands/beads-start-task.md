@@ -7,12 +7,29 @@ description: Start a Beads task - mark in_progress, create branch, initialize se
 When the user starts a task, execute these steps in order:
 
 ## Step 0: Pull Latest Beads (team sync)
-Before anything else, sync the beads store so you start from the team's latest state:
+
+Before anything else, bring both channels up to date so you start from the team's
+latest state. Code and beads travel separately: `git pull` carries code only, and
+beads sync over the Dolt remote on your git host (`refs/dolt/data`).
+`.beads/issues.jsonl` is just a readable export — it is never committed and never
+carries beads between machines.
+
+1. **Code:** `git pull` on the branch you are on (skip it if that branch has no
+   upstream yet).
+2. **Beads:** pull before reading or writing any bead:
+
 ```bash
-git pull            # default setup: beads travels as issues.jsonl in git
-# bd dolt pull      # Dolt-remote setup: beads is a separate channel
+# snippet: dolt-pull-guard
+if bd dolt remote list 2>/dev/null | grep -q 'No remotes configured'; then
+  echo "Beads: no Dolt remote configured — skipping bd dolt pull."
+else
+  bd dolt pull
+fi
 ```
-If a beads pull is rejected as diverged, do **not** `--force` — coordinate or re-pull.
+
+A project with no Dolt remote yet prints that one line and carries on. If the pull
+is rejected as diverged, do **not** `--force` — coordinate with whoever pushed, or
+re-pull.
 
 ## Step 1: Mark Task In Progress
 - Run `bd update <id> --status=in_progress` (use `beads:update` skill)
@@ -32,7 +49,7 @@ marker can record which task it covers):
 ```
 
 Also clear any stale verification marker from a previous task so it cannot pass
-the ship gate (router *Hard Stop: Verification Before Ship / "Done"*):
+the ship gate (router *Verification Before Ship / "Done"*):
 ```bash
 rm -f .beads/.verification-done
 ```

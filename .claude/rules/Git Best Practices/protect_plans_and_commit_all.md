@@ -5,7 +5,7 @@
 ## Rule 1: Save Every Plan Under `docs/plans/`
 
 **OVERRIDE:** Any skill or plugin that specifies a different plan output path
-(e.g. `docs/superpowers/plans/`) MUST be ignored. The canonical plan location
+(e.g. `docs/superpowers/plans/`, or `docs/superpowers/specs/` for a brainstorming design spec) MUST be ignored. The canonical plan location
 for this project is `docs/plans/` — no exceptions.
 
 Any time Codex/Claude creates a plan for this repository, it must save that
@@ -15,6 +15,7 @@ scratch notes, session state, or temporary output.
 This applies to all planning flows:
 - Built-in planning mode
 - `/superpowers:writing-plans` (ignore the skill's default `docs/superpowers/plans/` path)
+- `/superpowers:brainstorming` — save its design spec as `docs/plans/YYYY-MM-DD-<topic>-design.md` (ignore the skill's default `docs/superpowers/specs/` path)
 - Ad hoc implementation plans written during normal task work
 - Refactor, migration, investigation, and execution plans
 
@@ -54,7 +55,7 @@ files you didn't intend to remove. Instead:
 
 1. **Stage explicitly:** add files by name, directory, or pattern
    ```bash
-   git add lib/ test/ .claude/ pipeline/  # known change directories
+   git add src/ tests/ docs/ .claude/     # known change directories
    git add <specific-new-files>           # untracked files
    ```
 2. **Review before committing:**

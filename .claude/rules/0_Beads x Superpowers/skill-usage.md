@@ -14,7 +14,7 @@ namespace:skill-name
 
 | Wrong | Correct |
 |-------|---------|
-| `commit-push` | `commit-commands:commit-push` |
+| `clean_gone` | `commit-commands:clean_gone` |
 | `commit-push-pr` | `commit-commands:commit-push-pr` |
 | `commit` | `commit-commands:commit` |
 | `beads-start-task` | `workflow-commands:beads-start-task` |
@@ -25,9 +25,9 @@ namespace:skill-name
 
 | Namespace | Skills | Source |
 |-----------|--------|--------|
-| `commit-commands` | `commit`, `commit-push`, `commit-push-pr`, `clean_gone` | plugin (`commit-commands@claude-plugins-official`) |
+| `commit-commands` | `commit`, `commit-push-pr`, `clean_gone` | plugin (`commit-commands@claude-plugins-official`) |
 | `superpowers` | `test-driven-development`, `systematic-debugging`, `writing-plans`, etc. | plugin (`superpowers@claude-plugins-official`) |
-| `beads` | `stats`, `ready`, `list`, `show`, `create`, `update`, `close`, `sync`, etc. | plugin (`beads`) |
+| `beads` | `stats`, `ready`, `list`, `show`, `create`, `update`, `close`, `label`, etc. | plugin (`beads`) |
 | `workflow-commands` | `beads-start-task`, `beads-ship-task`, `plan-refinement-qa`, `plan-summary-console`, `python-verification-quick/standard/full`, `hotfix-interrupt`, `P*-*` phase gates, etc. | local (`.claude/Commands/workflow-commands/`) |
 
 > Only the namespaces above ship with this template. If you add your own local
@@ -100,13 +100,16 @@ plugin has no MCP layer, so invoking a `beads:*` skill means running the
 This is a single repo — Beads runs against the local store under `.beads/`.
 There is no multi-repo hub, so **`bd repo sync` is not part of any workflow here.**
 
-**Team sync depends on how your project is set up.** By default beads state
-travels as `issues.jsonl` committed alongside your code, so a normal
-`git commit` + `git push` ships both. If you configure a **Dolt remote**
-instead, beads becomes a **second channel**: sync it at session/task start and
-again at ship/session close (`bd dolt pull` / `bd dolt push`), in addition to
-`git push`. Either way, never `--force` a beads push except a deliberate,
-agreed re-baseline.
+**Beads syncs over its own channel.** Code travels by `git pull` / `git push`;
+beads travels by `bd dolt pull` / `bd dolt push`, through a Dolt remote on the
+project's own git remote
+(`bd dolt remote add origin git+https://github.com/<owner>/<repo>.git`). Pull
+both at session or task start and push both at ship or session close — pull
+first, push last — and never `--force` a beads push except a deliberate, agreed
+re-baseline. `.beads/issues.jsonl` is an untracked, readable export (refresh it
+with `bd export -o .beads/issues.jsonl`), not a sync channel. With no Dolt remote
+configured yet, `bd dolt pull` fails, so the pull step prints one line saying it
+skipped and continues; `bd dolt push` skips on its own. Full rules: `beads.md`.
 
 ### Skill Mapping
 
@@ -127,6 +130,6 @@ agreed re-baseline.
 | Check version | `beads:version` |
 | Show workflow guide | `beads:workflow` |
 | Audit interactions | `beads:audit` |
-| Pull teammate's beads (session/task START) | `git pull` — or `bd dolt pull` on a Dolt remote |
-| Publish your beads (ship / session CLOSE) | `git push` — or `bd dolt push` on a Dolt remote |
+| Pull at session/task START | `git pull` for code, then `bd dolt pull` for beads (with no Dolt remote yet: print one line and continue) |
+| Publish at ship / session CLOSE | `git push` for code, then `bd dolt push` for beads (skips on its own with no remote) |
 

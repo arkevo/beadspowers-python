@@ -6,7 +6,7 @@ description: Plan Refinement Q&A — analyze plan for improvements, ask targeted
 
 > **Mode: `interactive`.** This is the interactive adapter of the shared Refinement
 > Methodology (`references/refinement-methodology.md`) — live Q&A in main context. The
-> autonomous adapter (auto-select inside a `Workflow`) is `workflow-writing-plans`
+> autonomous adapter (auto-select inside a `Workflow`) is `workflow-commands:workflow-writing-plans`
 > Step 4. The methodology — decision discovery, tiers, per-decision anatomy,
 > recommendation logic — lives in the engine; this file owns only the interactive
 > delivery.
@@ -153,7 +153,7 @@ Plan updated: `docs/plans/[filename]`
 [N] refinements applied ([X] critical, [Y] recommended, [Z] nice-to-have).
 ```
 
-Then IMMEDIATELY auto-invoke `workflow-commands:plan-summary-console` (per the beads-workflow-router "Auto-Invoke: Plan Summary In Console After Refinement" rule). Do NOT ask the user — just invoke it. The summary command prints the numbered + bulleted plan recap in the console and then presents the execution gate itself.
+Then IMMEDIATELY auto-invoke `workflow-commands:plan-summary-console` (per the router's *Workflow Rules* section). Do NOT ask the user — just invoke it. The summary command prints the numbered + bulleted plan recap in the console and then presents the execution gate itself.
 
 **Do NOT present the execution gate from this skill.** The summary command owns that handoff now.
 

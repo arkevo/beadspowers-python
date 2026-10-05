@@ -7,24 +7,25 @@ Code review for security vulnerabilities, with focus on Python security patterns
 
 ## Auto-Trigger Patterns
 
-This phase auto-triggers in Standard verification when changes include:
+This phase runs in Standard and Full verification only when a file in the changed
+set matches one of these patterns; an unknown changed set counts as a match. Both
+tiers carry the same list in their Phase 14 gate, so keep all three in step.
 
 ### Path Patterns
-- `src/**/auth/**` - Authentication code
-- `src/**/api/**` - API endpoints
-- `src/**/service/**` - Service layer
-- `src/**/repository/**` - Data access layer
-- `src/**/network/**` - Network layer
-- `src/**/http/**` - HTTP clients
+- `src/**/auth/**`, `src/**/api/**`, `src/**/service*/**`, `src/**/repository/**`,
+  `src/**/network/**`, `src/**/http/**` - code that handles auth, requests and
+  data access
+- `**/migrations/**`, `alembic/versions/**`, `**/*.sql` - schema and database
+  authorization changes
+- settings modules (`**/settings.py`, `**/settings/**`) - debug flags and secrets
+- environment files (`.env`, `.env.*`) - secrets that must never be committed
 
 ### Content Patterns (file contains)
-- `requests`, `httpx`
-- `http`
-- `apiKey`, `api_key`, `API_KEY`
-- `secret`, `Secret`, `SECRET`
-- `token`, `Token`, `access_token`, `refresh_token`
-- `password`, `Password`
-- `credential`, `Credential`
+- `apiKey`, `api_key`, `secret`, `token`, `password`, `credential` (any case)
+- `requests`, `httpx`, `http`
+- `eval(`, `exec(`, `pickle`, `yaml.load`, `subprocess`, `shell=True`,
+  `verify=False`, `DEBUG`, `random.`
+- `GRANT`, `REVOKE`, `CREATE POLICY`, `ROW LEVEL SECURITY`, `SECURITY DEFINER`
 
 ---
 
@@ -35,7 +36,7 @@ This phase auto-triggers in Standard verification when changes include:
 **For local changes:**
 ```bash
 # Check session state for modified files
-cat .beads/.session-state.json | jq '.modified_files[].path'
+cat .beads/.session-state.json | jq -r '.modified_files[]'
 ```
 
 **For PR:**
@@ -98,6 +99,9 @@ result = eval(user_input)
 
 # BAD: pickle.loads on untrusted data
 # data = pickle.loads(untrusted_bytes)  -- do not deserialize untrusted data
+
+# BAD: yaml.load without a safe loader on untrusted data
+# config = yaml.load(untrusted_text)  -- use yaml.safe_load instead
 
 # GOOD: Use safe alternatives (ast.literal_eval, json, etc.)
 import ast
@@ -164,6 +168,22 @@ import logging
 logger = logging.getLogger(__name__)
 logger.debug("Authentication attempted for user %s", username)  # no password
 ```
+
+#### 2.10 Database Authorization
+Read every `GRANT`, `REVOKE`, row-level security policy (`CREATE POLICY`,
+`ROW LEVEL SECURITY`) and `SECURITY DEFINER` function in the changed migrations
+and SQL for cross-user access:
+
+```sql
+-- BAD: any signed-in user can read every row
+CREATE POLICY read_all ON documents FOR SELECT USING (true);
+
+-- GOOD: the policy names the requesting user
+CREATE POLICY read_own ON documents FOR SELECT
+  USING (owner_id = current_setting('app.user_id')::int);
+```
+
+The application-side authorization check that the policy backs must still exist.
 
 ### Step 6: Error Handling Security
 

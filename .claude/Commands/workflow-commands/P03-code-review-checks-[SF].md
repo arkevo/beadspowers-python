@@ -25,9 +25,9 @@ Provide a code review for the given pull request OR local changes.
 
 **Examples:**
 ```
-/python-code-review                              → reviews git diff only
-/python-code-review src/auth/login.py          → reviews only login.py
-/python-code-review src/auth/ src/core/utils.py → reviews auth dir + utils.py
+/workflow-commands:P03-code-review-checks-[SF]                             → reviews git diff only
+/workflow-commands:P03-code-review-checks-[SF] src/auth/login.py           → reviews only login.py
+/workflow-commands:P03-code-review-checks-[SF] src/auth/ src/core/utils.py → reviews auth dir + utils.py
 ```
 
 **Never scan the entire codebase. Always limit scope to specified or changed files.**
@@ -63,7 +63,7 @@ If no pull request is provided, review local changes. **Never scan the whole cod
 **Priority order for identifying files:**
 
 1. **Specific files provided**: If user provides file paths, review ONLY those files
-   - Example: `/python-code-review src/features/auth/login.py`
+   - Example: `/workflow-commands:P03-code-review-checks-[SF] src/features/auth/login.py`
 
 2. **Verification context**: If invoked from `superpowers:verification-before-completion`, review the files that were modified during the current task (from git diff)
 
