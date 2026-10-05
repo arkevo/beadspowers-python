@@ -25,7 +25,8 @@ Nothing else in the workflow writes `modified_files`.
 `workflow-commands:beads-start-task` creates `.beads/.session-state.json` with an
 empty list, and every verification skill only reads it. Left empty, every task
 would route to Quick (because `total_lines_changed` stays 0) and every scoped
-auto-fix would be skipped. So derive the changed set here, once. It is:
+auto-fix would be skipped. So derive the changed set here, once per
+implementation pass (a smoke-test fix is a new pass). It is:
 
 - tracked files with uncommitted edits, staged or not (deleted files are left out);
 - untracked files (nested repositories and worktrees are left out);
@@ -41,7 +42,8 @@ once. When the repository has no `origin` at all, the branch's own commits
 cannot be measured, so the block records the uncommitted and untracked files and
 says the branch range was skipped. When the trunk exists but HEAD shares no
 history with it — a shallow clone, or an unrelated branch — the block records
-nothing and exits 1, telling you to fetch the missing history: recording only the
+nothing and exits 1, telling you to fetch the missing history (or, on an unrelated
+branch, to name the task's files): recording only the
 uncommitted files would quietly drop the branch's commits from the level choice
 and from every review phase.
 
@@ -60,8 +62,8 @@ if [ -z "$trunk" ] || ! git rev-parse -q --verify "$trunk^{commit}" >/dev/null 2
 fi
 base=""
 [ -n "$trunk" ] && base=$(git merge-base "$trunk" HEAD 2>/dev/null)
-if [ -n "$trunk" ] && [ -z "$base" ]; then
-  echo "Changed set: NOT recorded - HEAD shares no history with $trunk (a shallow clone, or an unrelated branch), so the branch's own commits cannot be measured. Fetch the missing history (git fetch --unshallow, or git fetch --deepen=<n>) and re-run this block."
+if [ -n "$trunk" ] && [ -z "$base" ] && git rev-parse -q --verify HEAD >/dev/null 2>&1; then
+  echo "Changed set: NOT recorded - HEAD shares no history with $trunk (a shallow clone, or an unrelated branch), so the branch's own commits cannot be measured. In a shallow clone, fetch the missing history (git fetch --unshallow, or git fetch --deepen=<n>) and re-run this block; for a branch with unrelated history, name the task's files instead (Step 2b)."
   exit 1
 fi
 if [ -z "$base" ]; then
@@ -130,12 +132,17 @@ PY
 ```
 
 The block reads a possibly-dirty tree, so it can pick up unrelated
-work-in-progress. That is accepted here, and only here: it runs once, at the point
-where this task is what dirtied the tree, and it prints the list so you can see
+work-in-progress. That is accepted here, and only here: it runs once per
+implementation pass, at the point where this task is what dirtied the tree, and it prints the list so you can see
 what it caught. A verification skill never re-derives the set; when the set is
 unknown it skips its auto-fix instead (`.claude/rules/verification-write-scope.md`).
 
 ### Step 2b: Pick the level
+
+If Step 2a printed `Changed set: NOT recorded` and exited 1, do not pick a level
+from the file: it still holds an earlier run's values, or none. Fix what the
+message names and re-run Step 2a; for a branch that shares no history with the
+trunk, ask for the task's files as below instead.
 
 Read `modified_files` and `total_lines_changed` back from
 `.beads/.session-state.json`, then:

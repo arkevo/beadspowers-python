@@ -86,7 +86,7 @@ for path, xy in status().items():
     elif digest(path) != hashes.get(path):
         leaks.append(f"{path} (had uncommitted edits before; NOT reverted, review it)")
 if failed:
-    print("Auto-fixed: FAILED (" + "; ".join(failed) + ") - read ruff's error above; the fix did not complete")
+    print("Auto-fixed: FAILED (" + "; ".join(failed) + ") - read ruff's error above")
 else:
     print(f"Auto-fix ran on {len(files)} changed file(s).")
 print("Scope check: no files outside the changed set" if not leaks
@@ -170,7 +170,7 @@ for path, xy in status().items():
     elif digest(path) != hashes.get(path):
         leaks.append(f"{path} (had uncommitted edits before; NOT reverted, review it)")
 if failed:
-    print("Auto-fixed: FAILED (" + "; ".join(failed) + ") - read ruff's error above; the fix did not complete")
+    print("Auto-fixed: FAILED (" + "; ".join(failed) + ") - read ruff's error above")
 else:
     print(f"Auto-fix ran on {len(files)} changed file(s).")
 print("Scope check: no files outside the changed set" if not leaks

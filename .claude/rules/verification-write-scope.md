@@ -79,8 +79,10 @@ Report what they print in the verification report:
   the report carries as a failed lint phase, never as a pass;
 - `Scope check: no files outside the changed set`, or `Scope check: LEAK: [list]`,
   which stops the step until each listed file is inspected; nothing on the list was
-  reverted. A run that writes nothing — a skipped run, or one that failed on a
-  notebook before any write — prints no `Scope check:` line.
+  reverted. A run that never reaches a write — a skipped run, or one whose only
+  changed files were notebooks and ruff failed on them — prints no `Scope check:`
+  line; a run with Python files to rewrite always prints one, even after a notebook
+  failure.
 
 To inspect a leak, read `git diff HEAD -- <path>` (or the new file) for each listed
 path, leave the file as it is, and name it in the report with what changed. A LEAK

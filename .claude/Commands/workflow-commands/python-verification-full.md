@@ -110,8 +110,8 @@ read-only). In short:
 `--force-exclude` is required because ruff ignores its own `exclude` settings
 for files named on the command line. Never run ruff with an empty file list: a
 bare `ruff check --fix` rewrites the whole project. If no Python file is left
-after filtering, or `CHANGED_SET = UNKNOWN`, skip this step and say so in the
-report.
+after filtering, or `CHANGED_SET = UNKNOWN`, the block prints its `SKIPPED` line
+(after a read-only lint of any changed notebook): report it.
 
 Typically resolves: unused imports, import sorting, and simple style fixes.
 
@@ -488,7 +488,8 @@ Each launch prints `… started in the background as <jobId>. …`. Keep every
 job id: results are collected by id. Some companion versions (1.0.6, for one)
 accept `--background` for reviews but run them in the foreground: the launch then
 prints the whole review and no job id. Find each id with
-`node "$COMPANION" status --json`, which lists `running[]`, `latestFinished` and
+`node "$COMPANION" status --json` (run the `codex-companion` block first in the same
+Bash call, as for `result`), which lists `running[]`, `latestFinished` and
 `recent[]` with each job's `id`, `kind` and `createdAt`.
 
 ### Collecting Results
@@ -867,6 +868,7 @@ Found [N] issues before completion.
   *(or:* `SKIPPED (changed set unknown)` *or* `SKIPPED (no Python files in the changed set)` *or* `FAILED (<ruff call> exited <code>)`, a failed lint phase *)*
 - Scope check: no files outside the changed set
   *(or:* **LEAK: [list]** *— each reported, none reverted; inspect them before continuing)*
+  *(or:* not run *— the block skipped, or failed on notebooks before any write)*
 - Manual fixes needed: [N] issues
   - `file:line` - [description]
 
@@ -1544,14 +1546,18 @@ Verification Triggered
 ## Write Verification Marker (ONLY on PASS)
 
 Immediately before generating the Phase 13 report — and ONLY if Phase 11's tests
-passed (and no blocking finding remains) — write the marker the router's *Verification Before Ship / "Done"* and `workflow-commands:beads-ship-task` gate on:
+passed, no scoped-ruff block run (Phase 2 Step 3, Phase 8.5 step 6, Phase 12.5
+step 1) ended in `Auto-fixed: FAILED`, and no blocking finding remains — write the marker the router's *Verification Before Ship / "Done"* and `workflow-commands:beads-ship-task` gate on:
 
 ```bash
 TASK=$(python3 -c "import json;print(json.load(open('.beads/.session-state.json')).get('task_id',''))" 2>/dev/null)
 printf '{"level":"full","task":"%s","passed":true,"at":"%s"}\n' "$TASK" "$(date -u +%FT%TZ)" > .beads/.verification-done
 ```
 
-If tests failed or a blocking issue stands, do NOT write the marker (the gate stays closed).
+If tests failed, a scoped-ruff block ended in `Auto-fixed: FAILED`, or a blocking
+issue stands, do NOT write the marker, and delete any prior one
+(`rm -f .beads/.verification-done`): a marker left by an earlier passing run would
+keep the ship gate open.
 
 ---
 

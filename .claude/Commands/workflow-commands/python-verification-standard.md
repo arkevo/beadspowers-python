@@ -280,7 +280,9 @@ TASK=$(python3 -c "import json;print(json.load(open('.beads/.session-state.json'
 printf '{"level":"standard","task":"%s","passed":true,"at":"%s"}\n' "$TASK" "$(date -u +%FT%TZ)" > .beads/.verification-done
 ```
 
-If any phase FAILED, do NOT write the marker (leave any prior one; the gate stays closed).
+If any phase FAILED, do NOT write the marker, and delete any prior one
+(`rm -f .beads/.verification-done`): a marker left by an earlier passing run would
+keep the ship gate open.
 
 ---
 
@@ -298,7 +300,7 @@ Found [X] issues. [Y] auto-fixed. [Z] require attention.
 ### Lint Results (Phase 2)
 **Auto-fixed:** [N] issues across [M] changed files
 *(or:* `SKIPPED (changed set unknown)` *or* `SKIPPED (no Python files in the changed set)` *or* `FAILED (<ruff call> exited <code>)`, a failed lint phase *)*
-**Scope check:** no files outside the changed set / **LEAK: [list]**
+**Scope check:** no files outside the changed set / **LEAK: [list]** / not run (the block skipped, or failed on notebooks before any write)
 **Manual fixes needed:**
 - `file:line` - [description]
 

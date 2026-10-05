@@ -107,15 +107,17 @@ pytest -v
 
 The router's *Verification Before Ship / "Done"* and `workflow-commands:beads-ship-task`
 gate on this marker. Write it ONLY after tests pass and Phase 2 did not print
-`Auto-fixed: FAILED` (ruff itself failed, so nothing was linted) — never on
-failure:
+`Auto-fixed: FAILED` (a ruff call itself failed, so the lint phase did not pass) —
+never on failure:
 
 ```bash
 TASK=$(python3 -c "import json;print(json.load(open('.beads/.session-state.json')).get('task_id',''))" 2>/dev/null)
 printf '{"level":"quick","task":"%s","passed":true,"at":"%s"}\n' "$TASK" "$(date -u +%FT%TZ)" > .beads/.verification-done
 ```
 
-If tests FAILED, do NOT write the marker (leave any prior one; the gate stays closed).
+If tests FAILED or Phase 2 printed `Auto-fixed: FAILED`, do NOT write the marker,
+and delete any prior one (`rm -f .beads/.verification-done`): a marker left by an
+earlier passing run would keep the ship gate open.
 
 ---
 
@@ -130,7 +132,7 @@ Ran lint + tests on [N] changed files ([M] lines total).
 ### Lint Results
 **Auto-fixed:** [N] issues across [M] changed files
 *(or:* `SKIPPED (changed set unknown)` *or* `SKIPPED (no Python files in the changed set)` *or* `FAILED (<ruff call> exited <code>)`, a failed lint phase *)*
-**Scope check:** no files outside the changed set / **LEAK: [list]**
+**Scope check:** no files outside the changed set / **LEAK: [list]** / not run (the block skipped, or failed on notebooks before any write)
 **Remaining:** [N] issues
 - `file:line` - [issue description]
 

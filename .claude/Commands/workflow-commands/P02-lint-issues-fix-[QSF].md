@@ -120,11 +120,11 @@ outside the changed set is reported, not fixed):
    from Step 1 to confirm the lint issues are resolved.
 3. Re-run `mypy` on the same files to confirm the type errors are resolved.
 4. Optionally re-run `vulture src/` (read-only) to confirm the unused code is gone.
-5. Report a summary of the fixes applied, including the blocks' `Auto-fixed:` and
-   `Scope check:` lines.
-6. If Step 1 wrote the argument into `modified_files`, put back the value it
-   noted there (read the file, change that one key, write it back) and say so in
-   the summary.
+5. If Step 1 wrote the argument into `modified_files`, put back the value it
+   noted there (read the file, change that one key, write it back) before you
+   report, so the file is never left narrowed to this one path.
+6. Report a summary of the fixes applied, including the blocks' `Auto-fixed:` and
+   `Scope check:` lines, and say whether the changed set was put back.
 
 ## Priority Guidelines
 1. Fix ruff errors first (E-codes and F-codes — blocking or critical issues)
