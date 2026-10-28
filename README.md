@@ -2,14 +2,17 @@
 
 Beadspowers is a Claude Code workflow for Python projects that combines **Beads** issue tracking with the **Superpowers** plan → execute → verify lifecycle, and enforces the order. Work one task at a time with you in the loop, or hand Claude a whole epic to plan and build across parallel agents.
 
-## One task
+1.Ask claude code to create a new worktree and branch
+2. Drop the PRD, say "workflow sequence plans *prd/spec file name*": This command creates a Bead epic with tasks and sequence the tasks in order with which needs to be planned and executed before others can be. Output ins a sequence plan markdown and a Beads Epic Bead Tasks (type show me the beads epic and its tasks to see them)
+3. Take the sequence md file it outputs out and say "workflow writing plans *sequence file name*" 
+4. Clear session
+5. Take the plans it outsputs and say "workflow execute plans *beads epic id*" 
+6. Clear Session
+7. Most likely your Beads Epic has many tasks and you are not done, so the workflow will remind you if you should go back to "workflow writing plans" or "workflow execute plans"
+8. Say workflow ship epic Ship epic (creates CR or local if there is no package
 
-1. `/beads:ready`
-2. `/workflow-commands:beads-start-task <task-id>` — Claude announces the lane; in Lane C it asks the refinement questions and the execution choice.
-3. Verification runs automatically after execution.
-4. `/workflow-commands:beads-ship-task` — opens the PR and closes the bead.
-5. Merge the PR, then update your local trunk: `git switch main && git pull` (use `master` if that is your trunk).
-6. `/clear`
+**Context tip:** past roughly 30–50% of the context window in the middle of a phase, ask Claude for a handoff doc for the next session, `/clear`, and paste the doc back in.
+
 
 ## An epic
 
@@ -17,30 +20,6 @@ The epic workflow is for work too big to drive one task at a time: a spec that t
 
 ![Epic-batch workflow](assets/workflow-process-flow.drawio.png)
 
-1. From the main checkout, after `git switch main && git pull`: `git worktree add ../<project>-<epic> -b feat/<epic-slug>`, then `cd ../<project>-<epic> && claude`
-2. `/superpowers:brainstorming` — the approved spec lands in `docs/plans/`. When it asks you to review the written spec, review it, then go to step 3 instead of approving there: approving makes brainstorming start writing an implementation plan, and the epic's plans come from steps 4–6.
-3. `/clear`
-4. `/workflow-commands:workflow-planning-sequence --spec docs/plans/<date>-<topic>-design.md` — creates the epic; note its id.
-5. `/clear`
-6. `/workflow-commands:workflow-writing-plans <epic-id>`
-7. `/clear`
-8. Only if the epic has spike tasks:
-   1. `/workflow-commands:workflow-execute-spikes <epic-id>`
-   2. `/clear`
-   3. `/workflow-commands:workflow-writing-plans <epic-id>` again — it plans the tasks the spikes unblocked.
-   4. `/clear`
-9. `/workflow-commands:workflow-execution-sequence <epic-id>`
-10. `/clear`
-11. `/workflow-commands:workflow-execute-plans <epic-id>`
-12. `/clear`
-13. `/workflow-commands:workflow-ship-epic <epic-id>` — opens the PR.
-14. Merge the PR, then, in the main checkout, update your local trunk: `git switch main && git pull` (use `master` if that is your trunk).
-15. `/workflow-commands:workflow-ship-epic <epic-id>` again — confirms the merge and marks the epic shipped.
-16. `/clear`
-
-If tasks are left over after step 11, unplanned ones go back to step 6 and unordered ones to step 9.
-
-**Context tip:** past roughly 30–50% of the context window in the middle of a phase, ask Claude for a handoff doc for the next session, `/clear`, and paste the doc back in.
 
 ## What's inside
 
@@ -66,11 +45,9 @@ If tasks are left over after step 11, unplanned ones go back to step 6 and unord
    /plugin install beads@beads-marketplace
    /plugin install superpowers@claude-plugins-official
    /plugin install commit-commands@claude-plugins-official
-   /plugin marketplace add openai/codex-plugin-cc
-   /plugin install codex@openai-codex
+   /plugin marketplace add openai/codex-plugin-cc (optional for adversarial review)
+   /plugin install codex@openai-codex (optional for adversarial review)
    ```
-
-   The last two lines add the Codex plugin, which only the full verification tier's adversarial review uses; skip them if you don't use Codex.
 
 3. Copy the workflow in. It works at either level, so pick one:
 
