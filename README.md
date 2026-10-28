@@ -1,6 +1,6 @@
 # Beadspowers: Python
 
-Beadspowers is a Claude Code workflow for Python (post execution verification only) projects that combines **Beads** issue tracking with the **Superpowers** plan → execute → verify lifecycle, and enforces the order. Work one task at a time with you in the loop, or hand Claude a whole epic to plan and build across parallel agents.
+Beadspowers is a Claude Code workflow for Python (post execution verification only) projects that combines **Beads** issue tracking with the **Superpowers** plan → execute → verify lifecycle, and enforces the order. Hand Claude a whole large feature and have Beadpowers turn it into an epic of tasks and sequence dependency, plan with ultracode, execute with ultracode, and verify using python's best practices.
 
 1. Ask Claude Code to create a new worktree and branch.
 
