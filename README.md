@@ -39,7 +39,7 @@ Workflow Sequence Steps: This is the only thing you have to remember to use this
     - Ships the epic. It creates a CR, or ships locally if there is no package.
 
 
-## An epic
+## Workflow Diagram: Sequence, Plan, Execute, and Verify an epic worth of tasks in batch
 
 The epic workflow is for work too big to drive one task at a time: a spec that turns into many tasks, some depending on others and some with open questions. Run one by one, that keeps you in the loop for every step and wastes the parallelism; run all at once with no structure, the agents collide on the same files and the decisions behind them get lost. So the pipeline turns a brainstormed spec (Superpowers) into a Beads epic whose tasks are sequenced into waves and given a plan depth — a full plan, a lite plan or a test-first task card — and answers the open questions with throwaway spikes before planning what depends on them. It then executes the approved plans as parallel Claude Code agents, each in its own git worktree (tasks that need you, such as smoke tests, run one at a time in the main session). Each task is built test-first and verified at a tier sized to its diff: ruff, mypy and pytest always, with review agents and a Codex adversarial pass added at the full tier. Beads labels record every task's progress, so an interrupted run resumes where it stopped; a budget gate shows the cost before each fan-out; and shipping opens one PR for the whole epic, which counts as shipped only after the merge is confirmed.
 
