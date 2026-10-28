@@ -2,14 +2,27 @@
 
 Beadspowers is a Claude Code workflow for Python projects that combines **Beads** issue tracking with the **Superpowers** plan → execute → verify lifecycle, and enforces the order. Work one task at a time with you in the loop, or hand Claude a whole epic to plan and build across parallel agents.
 
-1.Ask claude code to create a new worktree and branch
-2. Drop the PRD, say "workflow sequence plans *prd/spec file name*": This command creates a Bead epic with tasks and sequence the tasks in order with which needs to be planned and executed before others can be. Output ins a sequence plan markdown and a Beads Epic Bead Tasks (type show me the beads epic and its tasks to see them)
-3. Take the sequence md file it outputs out and say "workflow writing plans *sequence file name*" 
-4. Clear session
-5. Take the plans it outsputs and say "workflow execute plans *beads epic id*" 
-6. Clear Session
-7. Most likely your Beads Epic has many tasks and you are not done, so the workflow will remind you if you should go back to "workflow writing plans" or "workflow execute plans"
-8. Say workflow ship epic Ship epic (creates CR or local if there is no package
+1. Ask Claude Code to create a new worktree and branch.
+
+2. Drop in the PRD and say: `workflow sequence plans <prd/spec file name>`
+
+    - This command creates a Beads epic with tasks, then puts the tasks in order so the ones other tasks depend on get planned and executed first.
+
+    - Output: a sequence plan markdown file and a Beads epic with its tasks. To see them, type "show me the beads epic and its tasks".
+
+3. Take the sequence `.md` file it outputs and say: `workflow writing plans <sequence file name>`
+
+4. /Clear the session.
+
+5. Take the plans it outputs and say: `workflow execute plans <beads epic id>`
+
+6. /Clear the session.
+
+7. Your Beads epic probably has many tasks, so you likely won't be done after one pass. The workflow will tell you whether to go back to `workflow writing plans` or `workflow execute plans`.
+
+8. Say: `workflow ship epic`
+
+    - Ships the epic. It creates a CR, or ships locally if there is no package.
 
 **Context tip:** past roughly 30–50% of the context window in the middle of a phase, ask Claude for a handoff doc for the next session, `/clear`, and paste the doc back in.
 
