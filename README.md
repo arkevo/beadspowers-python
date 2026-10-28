@@ -1,6 +1,6 @@
 # Beadspowers: Python
 
-Beadspowers is a Claude Code workflow for Python projects that combines **Beads** issue tracking with the **Superpowers** plan → execute → verify lifecycle, and enforces the order. Work one task at a time with you in the loop, or hand Claude a whole epic to plan and build across parallel agents.
+Beadspowers is a Claude Code workflow for Python (post execution verification only) projects that combines **Beads** issue tracking with the **Superpowers** plan → execute → verify lifecycle, and enforces the order. Work one task at a time with you in the loop, or hand Claude a whole epic to plan and build across parallel agents.
 
 1. Ask Claude Code to create a new worktree and branch.
 
@@ -12,7 +12,7 @@ Beadspowers is a Claude Code workflow for Python projects that combines **Beads*
 
 3. Take the sequence `.md` file it outputs and say: `workflow writing plans <sequence file name>`
 
-    - This command uses Superpowers to write the implementation plans, in ultracode batch,for the first wave of tasks, meaning the tasks that don't depend on anything still unfinished.
+    - This command writes the implementation plans for the first wave of tasks, meaning the tasks that don't depend on anything still unfinished.
 
     - First output (human in the loop): before it finalizes anything, the flow asks you to review the critical questions it found and interviews you about your plan. Your answers shape the final plans.
 
@@ -22,7 +22,9 @@ Beadspowers is a Claude Code workflow for Python projects that combines **Beads*
 
 5. Take the plans it outputs and say: `workflow execute plans <beads epic id>`
 
-    - This command uses Superpowers to execute, in batch, approved plans for the first wave of tasks, building the tasks in parallel where they don't touch the same files.
+    - This command runs the approved plans for the first wave, building the tasks in parallel where they don't touch the same files.
+
+    - Verification: the Python code verification phases run on the new code. If your project uses another language, verification is skipped.
 
     - Output: the first wave of executed tasks, with the code committed on the branch, each task labelled with how far it got (for example done or blocked), and a completion report showing the whole epic's status and what to run next.
 
@@ -32,7 +34,7 @@ Beadspowers is a Claude Code workflow for Python projects that combines **Beads*
 
 8. Say: `workflow ship epic`
 
-    - Ships the epic. It creates a PR, or ships locally if there is no package.
+    - Ships the epic. It creates a CR, or ships locally if there is no package.
 
 
 ## An epic
