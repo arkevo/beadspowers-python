@@ -12,19 +12,27 @@ Beadspowers is a Claude Code workflow for Python projects that combines **Beads*
 
 3. Take the sequence `.md` file it outputs and say: `workflow writing plans <sequence file name>`
 
-4. /Clear the session.
+    - This command writes the implementation plans for the first wave of tasks, meaning the tasks that don't depend on anything still unfinished.
+
+    - First output (human in the loop): before it finalizes anything, the flow asks you to review the critical questions it found and interviews you about your plan. Your answers shape the final plans.
+
+    - Final output: the first wave of plan files in `docs/plans/`, with each task in the epic labelled to show how far its plan got (for example drafted or approved).
+
+4. Clear the session.
 
 5. Take the plans it outputs and say: `workflow execute plans <beads epic id>`
 
-6. /Clear the session.
+    - This command runs the approved plans for the first wave, building the tasks in parallel where they don't touch the same files.
+
+    - Output: the first wave of executed tasks, with the code committed on the branch, each task labelled with how far it got (for example done or blocked), and a completion report showing the whole epic's status and what to run next.
+
+6. Clear the session.
 
 7. Your Beads epic probably has many tasks, so you likely won't be done after one pass. The workflow will tell you whether to go back to `workflow writing plans` or `workflow execute plans`.
 
 8. Say: `workflow ship epic`
 
-    - Ships the epic. It creates a CR, or ships locally if there is no package.
-
-**Context tip:** past roughly 30–50% of the context window in the middle of a phase, ask Claude for a handoff doc for the next session, `/clear`, and paste the doc back in.
+    - Ships the epic. It creates a PR, or ships locally if there is no package.
 
 
 ## An epic
